@@ -1,51 +1,70 @@
 import React, { useState } from 'react';
-import { signup } from '../api/auth';
-import { useNavigate } from 'react-router-dom';
-import Navbar from '../components/Navbar';
+import { getMe, signup, googleLogin } from '../api/auth';
+import PublicNavbar from '../components/PublicNavbar.jsx';
+import { useNavigate, Link } from 'react-router-dom';
+import { GoogleLogin } from '@react-oauth/google';
+import { useAuth } from '../context/AuthContext';
 
 export default function SignUp() {
   const [form, setForm] = useState({ email: '', password: '' });
-  const [error, setError] = useState('');
+  const [errors, setErrors] = useState({});
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { setUser } = useAuth();
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
-    setError('');
   };
 
   const validate = () => {
-    const validEmail = /\S+@\S+\.\S+/.test(form.email);
-    const validPassword = form.password.length >= 6;
-    if (!validEmail || !validPassword) {
-      setError('Invalid email or password.');
-      return false;
-    }
-    return true;
+    const newErrors = {};
+    if (!/\S+@\S+\.\S+/.test(form.email)) newErrors.email = 'Invalid email.';
+    if (form.password.length < 6) newErrors.password = 'Minimum 6 characters.';
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validate()) return;
+    setLoading(true);
 
     try {
-      await signup(form);
-      navigate('/login');
+      const res = await signup(form);
+      localStorage.setItem('token', res.data.token);
+      navigate('/dashboard');
     } catch (err) {
-      setError(
-        err?.response?.data?.error ||
-        err?.response?.data?.message ||
-        'Signup failed.'
-      );
+      console.error(err);
+      alert(err?.response?.data?.error || 'Signup failed.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleSuccess = async (res) => {
+    try {
+      const response = await googleLogin(res.credential);
+
+      const token = response.data.token;
+      localStorage.setItem('token', token);
+
+      const me = await getMe();
+      setUser(me.data);
+
+      navigate('/dashboard');
+    } catch (err) {
+      console.error('Google sign-up error:', err);
+      alert(err?.response?.data?.error || 'Google sign-up failed.');
     }
   };
 
   return (
     <>
-      <Navbar />
+      <PublicNavbar />
       <div className="auth-container">
         <div className="auth-box">
-          <h2 className="auth-title">Sign up</h2>
-          <form onSubmit={handleSubmit} className="auth-form" noValidate>
+          <h2 className="auth-title">Sign Up</h2>
+          <form onSubmit={handleSubmit} className="auth-form">
             <div className="form-group">
               <label htmlFor="email">Email</label>
               <input
@@ -54,8 +73,9 @@ export default function SignUp() {
                 name="email"
                 value={form.email}
                 onChange={handleChange}
-                className={`form-input ${error ? 'form-error' : ''}`}
+                className={errors.email ? 'error' : ''}
               />
+              {errors.email && <p className="error-text">{errors.email}</p>}
             </div>
 
             <div className="form-group">
@@ -66,22 +86,38 @@ export default function SignUp() {
                 name="password"
                 value={form.password}
                 onChange={handleChange}
-                className={`form-input ${error ? 'form-error' : ''}`}
+                className={errors.password ? 'error' : ''}
               />
+              {errors.password && <p className="error-text">{errors.password}</p>}
             </div>
 
-            <p className="error-message" style={{ visibility: error ? 'visible' : 'hidden' }}>
-              {error || 'placeholder'}
-            </p>
-
-            <button type="submit" className="auth-button">
-              Create Account
+            <button type="submit" className="auth-button" disabled={loading}>
+              {loading ? 'Signing up...' : 'Sign Up'}
             </button>
-
-            <p className="auth-switch">
-              Already registered? <a href="/login">Log in</a>
-            </p>
           </form>
+
+          <div className="divider">
+              <span className="line" />
+              <span className="or-text">OR</span>
+              <span className="line" />
+          </div>
+
+          <div className="google-button-wrapper" style={{ width: '100%' }}>
+            <GoogleLogin
+              onSuccess={handleGoogleSuccess}
+              onError={() => console.log('Google Login Failed')}
+              theme="outline"
+              size="large"
+              width="100%"
+            />
+          </div>
+
+          <p style={{ marginTop: '1.5rem', textAlign: 'left', fontSize: '0.95rem' }}>
+            Already have an account?{' '}
+            <Link to="/login" style={{ color: '#007bff', textDecoration: 'underline' }}>
+              Log in
+            </Link>
+          </p>
         </div>
       </div>
     </>

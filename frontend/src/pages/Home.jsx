@@ -1,13 +1,13 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import Navbar from '../components/Navbar';
+import PublicNavbar from '../components/PublicNavbar.jsx';
 
 const Home = () => {
   const navigate = useNavigate();
 
   return (
     <>
-      <Navbar />
+      <PublicNavbar />
 
       <div className="container" style={{ textAlign: 'center', padding: '10rem 2rem 8rem'}}>
         <h1 className={'heading'}>Make videos that stand out, <br /> starting with the idea.</h1>

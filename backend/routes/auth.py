@@ -1,6 +1,8 @@
 from flask import Blueprint, request, jsonify, current_app
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta, timezone
+from google.oauth2 import id_token
+from google.auth.transport import requests as google_requests
 import jwt
 from utils.security import token_required
 
@@ -57,6 +59,47 @@ def login():
         "token": token,
     }), 200
 
+@auth_bp.route("/google", methods=["POST"])
+def google_login():
+    mongo = current_app.extensions["pymongo"]
+    users = mongo.db.users
+
+    data = request.get_json()
+    token = data.get("credential")
+
+    try:
+        # Verify token with Google
+        idinfo = id_token.verify_oauth2_token(
+            token,
+            google_requests.Request(),
+            current_app.config["GOOGLE_CLIENT_ID"]
+        )
+
+        email = idinfo["email"]
+        name = idinfo.get("name", "")
+
+        # Check if user exists, if not, create them
+        user = users.find_one({"email": email})
+        if not user:
+            users.insert_one({
+                "email": email,
+                "name": name,
+                "auth_provider": "google"
+            })
+
+        # Create a JWT for our app
+        our_token = jwt.encode(
+            {"email": email},
+            current_app.config["JWT_KEY"],
+            algorithm="HS256"
+        )
+        if isinstance(our_token, bytes):
+            our_token = our_token.decode("utf-8")
+
+        return jsonify({"token": our_token}), 200
+
+    except ValueError:
+        return jsonify({"error": "Invalid Google token"}), 401
 
 @auth_bp.route("/me", methods=["GET"])
 @token_required

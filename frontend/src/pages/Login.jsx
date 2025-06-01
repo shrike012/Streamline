@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
-import { login } from '../api/auth';
-import Navbar from '../components/Navbar';
-import { useNavigate } from 'react-router-dom';
+import {login, googleLogin, getMe} from '../api/auth';
+import PublicNavbar from '../components/PublicNavbar.jsx';
+import { useNavigate, Link } from 'react-router-dom';
+import { GoogleLogin } from '@react-oauth/google';
+import {useAuth} from "../context/AuthContext.jsx";``
 
 export default function Login() {
   const [form, setForm] = useState({ email: '', password: '' });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const { setUser } = useAuth();
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -29,7 +32,9 @@ export default function Login() {
     try {
       const res = await login(form);
       localStorage.setItem('token', res.data.token);
-      navigate('/workspace');
+      const me = await getMe();
+      setUser(me.data);
+      navigate('/dashboard');
     } catch (err) {
       console.error(err);
       alert(err?.response?.data?.error || 'Login failed.');
@@ -38,9 +43,24 @@ export default function Login() {
     }
   };
 
+  const handleGoogleSuccess = async (res) => {
+    try {
+      const response = await googleLogin(res.credential);
+      const token = response.data.token;
+
+      localStorage.setItem('token', token);
+      const me = await getMe();
+      setUser(me.data);
+      navigate('/dashboard');
+    } catch (err) {
+      console.error('Google login error:', err);
+      alert(err?.response?.data?.error || 'Google login failed.');
+    }
+  };
+
   return (
     <>
-      <Navbar />
+      <PublicNavbar />
       <div className="auth-container">
         <div className="auth-box">
           <h2 className="auth-title">Log In</h2>
@@ -75,6 +95,30 @@ export default function Login() {
               {loading ? 'Logging in...' : 'Log In'}
             </button>
           </form>
+
+          <div className="divider">
+            <span className="line" />
+            <span className="or-text">OR</span>
+            <span className="line" />
+          </div>
+
+          <div className="google-button-wrapper" style={{ width: '100%' }}>
+            <GoogleLogin
+              onSuccess={handleGoogleSuccess}
+              onError={() => console.log('Google Login Failed')}
+              theme="outline"
+              size="large"
+              width="100%"
+            />
+          </div>
+
+          {/* Don't have an account */}
+          <p style={{ marginTop: '1.5rem', textAlign: 'left', fontSize: '0.95rem' }}>
+            Don’t have an account?{' '}
+            <Link to="/signup" style={{ color: '#007bff', textDecoration: 'underline' }}>
+              Sign up
+            </Link>
+          </p>
         </div>
       </div>
     </>
