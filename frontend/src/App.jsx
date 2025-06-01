@@ -1,9 +1,12 @@
 import { Routes, Route } from 'react-router-dom';
 import Home from './pages/Home';
-import Dashboard from './pages/Dashboard.jsx';
+import Dashboard from './pages/Dashboard';
 import SignUp from './pages/SignUp';
 import Login from './pages/Login';
-import './index.css';
+import AppLayout from './layouts/AppLayout';
+import PublicLayout from './layouts/PublicLayout';
+import RequireAuth from './components/RequireAuth';
+import './styles/globals.css';
 
 import { GoogleOAuthProvider } from '@react-oauth/google';
 
@@ -13,10 +16,27 @@ function App() {
   return (
     <GoogleOAuthProvider clientId={clientId}>
       <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/signup" element={<SignUp />} />
-        <Route path="/login" element={<Login />} />
+
+        {/* Public Layout */}
+        <Route element={<PublicLayout />}>
+          <Route path="/" element={<Home />} />
+          <Route path="/signup" element={<SignUp />} />
+          <Route path="/login" element={<Login />} />
+        </Route>
+
+        {/* Authenticated App Layout */}
+        <Route
+          path="/app"
+          element={
+            <RequireAuth>
+              <AppLayout />
+            </RequireAuth>
+          }
+        >
+          <Route path="dashboard" element={<Dashboard />} />
+          {/* Add more app pages here */}
+        </Route>
+
       </Routes>
     </GoogleOAuthProvider>
   );

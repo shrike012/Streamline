@@ -3,7 +3,8 @@ import {login, googleLogin, getMe} from '../api/auth';
 import PublicNavbar from '../components/PublicNavbar.jsx';
 import { useNavigate, Link } from 'react-router-dom';
 import { GoogleLogin } from '@react-oauth/google';
-import {useAuth} from "../context/AuthContext.jsx";``
+import { useAuth } from "../context/AuthContext.jsx";``
+import '../styles/auth.css';
 
 export default function Login() {
   const [form, setForm] = useState({ email: '', password: '' });
@@ -51,7 +52,7 @@ export default function Login() {
       localStorage.setItem('token', token);
       const me = await getMe();
       setUser(me.data);
-      navigate('/dashboard');
+      navigate('/app/dashboard');
     } catch (err) {
       console.error('Google login error:', err);
       alert(err?.response?.data?.error || 'Google login failed.');
@@ -102,14 +103,19 @@ export default function Login() {
             <span className="line" />
           </div>
 
-          <div className="google-button-wrapper" style={{ width: '100%' }}>
-            <GoogleLogin
-              onSuccess={handleGoogleSuccess}
-              onError={() => console.log('Google Login Failed')}
-              theme="outline"
-              size="large"
-              width="100%"
-            />
+          <div className="google-button-wrapper">
+            <div style={{ width: '100%' }}>
+              <GoogleLogin
+                onSuccess={handleGoogleSuccess}
+                onError={() => console.log('Google Login Failed')}
+                theme="outline"
+                size="large"
+                shape="rectangular"
+                text="signin_with"
+                width="100%"
+                useOneTap={false}
+              />
+            </div>
           </div>
 
           {/* Don't have an account */}

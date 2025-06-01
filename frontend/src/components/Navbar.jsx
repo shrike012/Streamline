@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { FiBell, FiMoreVertical } from 'react-icons/fi'; // icons
+import { FiBell, FiMoreVertical } from 'react-icons/fi';
+import '../styles/navbar.css';
 
 const Navbar = () => {
   const [menuOpen, setMenuOpen] = useState(false);

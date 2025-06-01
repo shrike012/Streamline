@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { getMe, signup, googleLogin } from '../api/auth';
+import {googleLogin, getMe, signup} from '../api/auth';
 import PublicNavbar from '../components/PublicNavbar.jsx';
 import { useNavigate, Link } from 'react-router-dom';
 import { GoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../context/AuthContext';
+import '../styles/auth.css';
 
 export default function SignUp() {
   const [form, setForm] = useState({ email: '', password: '' });
@@ -51,7 +52,7 @@ export default function SignUp() {
       const me = await getMe();
       setUser(me.data);
 
-      navigate('/dashboard');
+      navigate('/app/dashboard');
     } catch (err) {
       console.error('Google sign-up error:', err);
       alert(err?.response?.data?.error || 'Google sign-up failed.');
@@ -102,13 +103,22 @@ export default function SignUp() {
               <span className="line" />
           </div>
 
-          <div className="google-button-wrapper" style={{ width: '100%' }}>
+          <div className="google-button-wrapper">
             <GoogleLogin
               onSuccess={handleGoogleSuccess}
               onError={() => console.log('Google Login Failed')}
               theme="outline"
               size="large"
-              width="100%"
+              shape="rectangular"
+              text="signin_with"
+              useOneTap={false}
+              containerProps={{
+                style: {
+                  width: '100%',
+                  display: 'flex',
+                  justifyContent: 'center'
+                }
+              }}
             />
           </div>
 

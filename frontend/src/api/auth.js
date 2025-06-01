@@ -1,4 +1,4 @@
-import axios from './axios';
+import axios from './axios'; // uses custom axios instance (not the axios library directly)
 
 export const signup = (data) => axios.post('/auth/signup', data);
 export const login = (data) => axios.post('/auth/login', data);
