@@ -37,34 +37,16 @@
   cursor: pointer;
 }
 
-.auth-switch a {
-  color: #007bff;
-  text-decoration: none;
-}
-
-.auth-switch a:visited {
-  color: #007bff;
-}
-
-.form-input {
-  padding: 0.75rem;
-  border-radius: 8px;
-  border: 1px solid #444;
-  background-color: #14181c;
-  color: #f9fafb;
-  font-size: 1rem;
-}
-
 .form-group {
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
 }
 
-.form-error {
-  border: 1px solid #d9534f !important;
-  background-color: #2e3338;
-  color: #f9fafb;
+.error-text {
+  color: #ff6b6b;
+  font-size: 0.9rem;
+  margin-top: 0.25rem;
 }
 
 .divider {
@@ -85,17 +67,4 @@
   color: #aaa;
   font-size: 0.85rem;
   white-space: nowrap;
-}
-
-.google-button-wrapper {
-  width: 100%;
-  display: flex;
-  justify-content: center;
-}
-
-.google-button-wrapper > div {
-  width: 100% !important;
-  max-width: 100% !important;
-  display: flex;
-  justify-content: center;
 }

@@ -1,29 +1,29 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { getMe } from '../api/auth';
-import Navbar from '../components/Navbar';
+import { useAuth } from '../context/AuthContext';
 
-const Dashboard = () => {
-  const [email, setEmail] = useState('');
+function Dashboard() {
+  const { setUser } = useAuth();
 
   useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        const res = await getMe();
-        setEmail(res.data.email);
-      } catch (err) {
-        console.error('Failed to fetch user info:', err);
-      }
-    };
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get("token");
 
-    fetchUser();
+    if (token) {
+      localStorage.setItem("token", token);
+      window.history.replaceState({}, document.title, window.location.pathname);
+
+      getMe().then(res => setUser(res.data)).catch(err => {
+        console.error("Failed to fetch user after login:", err);
+      });
+    }
   }, []);
 
   return (
-    <>
-      <Navbar />
-      <h1>Hi, {email || 'loading...'}</h1>
-    </>
+    <div>
+      {/* your dashboard content */}
+    </div>
   );
-};
+}
 
 export default Dashboard;

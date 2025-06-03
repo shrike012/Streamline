@@ -1,28 +1,50 @@
-import React, { useState } from 'react';
-import {login, googleLogin, getMe} from '../api/auth';
+import React, { useState, useEffect } from 'react';
+import { getMe, login } from '../api/auth';
 import PublicNavbar from '../components/PublicNavbar.jsx';
-import { useNavigate, Link } from 'react-router-dom';
-import { GoogleLogin } from '@react-oauth/google';
-import { useAuth } from "../context/AuthContext.jsx";``
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from "../context/AuthContext.jsx";
 import '../styles/auth.css';
+
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+const REDIRECT_URI = import.meta.env.VITE_GOOGLE_REDIRECT_URI;
+const SCOPE = "https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile openid";
 
 export default function Login() {
   const [form, setForm] = useState({ email: '', password: '' });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
   const { setUser } = useAuth();
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const hasGoogleCode = params.get("code");
+
+    // Whether it's Google or regular login, check if user is already authenticated
+    getMe().then(res => {
+      setUser(res.data);
+      navigate('/app/dashboard');
+    }).catch(err => {
+      console.error("Not logged in yet:", err);
+    });
+
+    // Clean up the URL if there's a code in it (from Google OAuth redirect)
+    if (hasGoogleCode) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, [location, setUser, navigate]);
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
   const validate = () => {
-    const newErrors = {};
-    if (!/\S+@\S+\.\S+/.test(form.email)) newErrors.email = 'Invalid email.';
-    if (form.password.length < 6) newErrors.password = 'Minimum 6 characters.';
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    if (!form.email || !form.password) {
+      setErrors({ form: 'Invalid credentials.' });
+      return false;
+    }
+    return true;
   };
 
   const handleSubmit = async (e) => {
@@ -31,32 +53,20 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const res = await login(form);
-      localStorage.setItem('token', res.data.token);
+      await login(form);
       const me = await getMe();
       setUser(me.data);
-      navigate('/dashboard');
+      navigate('/app/dashboard');
     } catch (err) {
       console.error(err);
-      alert(err?.response?.data?.error || 'Login failed.');
+      setErrors({ form: 'Invalid credentials.' });
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGoogleSuccess = async (res) => {
-    try {
-      const response = await googleLogin(res.credential);
-      const token = response.data.token;
-
-      localStorage.setItem('token', token);
-      const me = await getMe();
-      setUser(me.data);
-      navigate('/app/dashboard');
-    } catch (err) {
-      console.error('Google login error:', err);
-      alert(err?.response?.data?.error || 'Google login failed.');
-    }
+  const handleGoogleRedirect = () => {
+    window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${REDIRECT_URI}&response_type=code&scope=${SCOPE}&access_type=offline&prompt=consent`;
   };
 
   return (
@@ -65,6 +75,7 @@ export default function Login() {
       <div className="auth-container">
         <div className="auth-box">
           <h2 className="auth-title">Log In</h2>
+
           <form onSubmit={handleSubmit} className="auth-form">
             <div className="form-group">
               <label htmlFor="email">Email</label>
@@ -76,7 +87,6 @@ export default function Login() {
                 onChange={handleChange}
                 className={errors.email ? 'error' : ''}
               />
-              {errors.email && <p className="error-text">{errors.email}</p>}
             </div>
 
             <div className="form-group">
@@ -89,8 +99,9 @@ export default function Login() {
                 onChange={handleChange}
                 className={errors.password ? 'error' : ''}
               />
-              {errors.password && <p className="error-text">{errors.password}</p>}
             </div>
+
+            {errors.form && <p className="error-text">{errors.form}</p>}
 
             <button type="submit" className="auth-button" disabled={loading}>
               {loading ? 'Logging in...' : 'Log In'}
@@ -104,21 +115,24 @@ export default function Login() {
           </div>
 
           <div className="google-button-wrapper">
-            <div style={{ width: '100%' }}>
-              <GoogleLogin
-                onSuccess={handleGoogleSuccess}
-                onError={() => console.log('Google Login Failed')}
-                theme="outline"
-                size="large"
-                shape="rectangular"
-                text="signin_with"
-                width="100%"
-                useOneTap={false}
-              />
+            <div>
+              <button
+                onClick={handleGoogleRedirect}
+                className="auth-button"
+                style={{
+                  width: '100%',
+                  backgroundColor: 'white',
+                  color: '#333',
+                  border: '1px solid #ccc',
+                  marginTop: 0,
+                }}
+                disabled={loading}
+              >
+                Continue with Google
+              </button>
             </div>
           </div>
 
-          {/* Don't have an account */}
           <p style={{ marginTop: '1.5rem', textAlign: 'left', fontSize: '0.95rem' }}>
             Don’t have an account?{' '}
             <Link to="/signup" style={{ color: '#007bff', textDecoration: 'underline' }}>

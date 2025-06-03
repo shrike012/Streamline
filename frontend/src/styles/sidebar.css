@@ -1,0 +1,21 @@
+.sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  width: 70px;
+  background-color: #b19cd9;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1rem 0;
+  border-top-right-radius: 16px;
+  border-bottom-right-radius: 16px;
+  gap: 2rem;
+  z-index: 999;
+}
+
+.sidebar-section {
+  font-size: 1.5rem;
+  cursor: pointer;
+}

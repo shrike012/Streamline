@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import { getMe } from '../api/auth';
+import { getMe, logout as logoutRequest } from '../api/auth';
 import { useNavigate } from 'react-router-dom';
 
 const AuthContext = createContext();
@@ -11,17 +11,15 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const checkAuth = async () => {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        setLoading(false);
-        return;
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("token")) {
+        window.history.replaceState({}, document.title, window.location.pathname);
       }
 
       try {
-        const res = await getMe();
+        const res = await getMe(); // Cookie gets sent automatically
         setUser(res.data);
       } catch {
-        localStorage.removeItem('token');
         setUser(null);
       } finally {
         setLoading(false);
@@ -31,14 +29,18 @@ export const AuthProvider = ({ children }) => {
     checkAuth();
   }, []);
 
-  const logout = () => {
-    localStorage.removeItem('token');
+  const logoutUser = async () => {
+    try {
+      await logoutRequest(); // Clears the cookie on the backend
+    } catch (err) {
+      console.error("Logout failed:", err);
+    }
     setUser(null);
     navigate('/login');
   };
 
   return (
-    <AuthContext.Provider value={{ user, setUser, logout, loading }}>
+    <AuthContext.Provider value={{ user, setUser, logout: logoutUser, loading }}>
       {children}
     </AuthContext.Provider>
   );

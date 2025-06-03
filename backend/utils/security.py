@@ -1,27 +1,41 @@
-from functools import wraps
 from flask import request, jsonify, current_app
+from functools import wraps
 import jwt
+
+def _verify_token():
+    token = request.cookies.get("token")
+    if not token:
+        return None, {"error": "Missing token"}, 401
+    try:
+        data = jwt.decode(token, current_app.config["JWT_KEY"], algorithms=["HS256"])
+        return data, None, None
+    except jwt.ExpiredSignatureError:
+        return None, {"error": "Token expired"}, 401
+    except jwt.InvalidTokenError:
+        return None, {"error": "Invalid token"}, 401
 
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-        token = None
+        data, error_response, status = _verify_token()
+        if error_response:
+            return jsonify(error_response), status
+        request.user_email = data["email"]
+        return f(*args, **kwargs)
+    return decorated
 
-        # Get token from Authorization header
-        auth_header = request.headers.get("Authorization")
-        if auth_header and auth_header.startswith("Bearer "):
-            token = auth_header.split(" ")[1]
+def auth_and_csrf_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        data, error_response, status = _verify_token()
+        if error_response:
+            return jsonify(error_response), status
+        request.user_email = data["email"]
 
-        if not token:
-            return jsonify({"error": "Token is missing"}), 401
-
-        try:
-            decoded = jwt.decode(token, current_app.config["JWT_KEY"], algorithms=["HS256"])
-            request.user_email = decoded["email"]
-        except jwt.ExpiredSignatureError:
-            return jsonify({"error": "Token expired"}), 401
-        except jwt.InvalidTokenError:
-            return jsonify({"error": "Invalid token"}), 401
+        csrf_cookie = request.cookies.get("csrf_token")
+        csrf_header = request.headers.get("X-CSRF-Token")
+        if not csrf_cookie or not csrf_header or csrf_cookie != csrf_header:
+            return jsonify({"error": "CSRF validation failed"}), 403
 
         return f(*args, **kwargs)
     return decorated

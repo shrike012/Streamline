@@ -11,6 +11,9 @@ CORS(app)
 app.config["MONGO_URI"] = os.getenv("MONGO_URI")
 app.config["JWT_KEY"] = os.getenv("JWT_KEY")
 app.config["GOOGLE_CLIENT_ID"] = os.getenv("GOOGLE_CLIENT_ID")
+app.config["GOOGLE_CLIENT_SECRET"] = os.getenv("GOOGLE_CLIENT_SECRET")
+app.config["GOOGLE_REDIRECT_URI"] = os.getenv("GOOGLE_REDIRECT_URI")
+app.config["FRONTEND_REDIRECT_URI"] = os.getenv("FRONTEND_REDIRECT_URI")
 
 mongo = PyMongo(app)
 
@@ -25,9 +28,5 @@ app.register_blueprint(idea_bp, url_prefix="/api/idea")
 app.register_blueprint(packaging_bp, url_prefix="/api/packaging")
 app.register_blueprint(auth_bp, url_prefix="/api/auth")
 
-@app.route("/")
-def index():
-    return {"message": "Flask backend is running."}
-
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=8080)
+    app.run(debug=True, host="0.0.0.0", port=8080)

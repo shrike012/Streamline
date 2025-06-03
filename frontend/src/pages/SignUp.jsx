@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
-import {googleLogin, getMe, signup} from '../api/auth';
+import {signup} from '../api/auth';
 import PublicNavbar from '../components/PublicNavbar.jsx';
 import { useNavigate, Link } from 'react-router-dom';
-import { GoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../context/AuthContext';
 import '../styles/auth.css';
+
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+const REDIRECT_URI = import.meta.env.VITE_GOOGLE_REDIRECT_URI;
+const SCOPE = "https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile openid";
 
 export default function SignUp() {
   const [form, setForm] = useState({ email: '', password: '' });
@@ -18,11 +21,11 @@ export default function SignUp() {
   };
 
   const validate = () => {
-    const newErrors = {};
-    if (!/\S+@\S+\.\S+/.test(form.email)) newErrors.email = 'Invalid email.';
-    if (form.password.length < 6) newErrors.password = 'Minimum 6 characters.';
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    if (!form.email || !form.password) {
+      setErrors({ form: 'Invalid credentials.' });
+      return false;
+    }
+    return true;
   };
 
   const handleSubmit = async (e) => {
@@ -31,9 +34,10 @@ export default function SignUp() {
     setLoading(true);
 
     try {
-      const res = await signup(form);
-      localStorage.setItem('token', res.data.token);
-      navigate('/dashboard');
+      await signup(form);
+      const me = await getMe();
+      setUser(me.data);
+      navigate('/app/dashboard');
     } catch (err) {
       console.error(err);
       alert(err?.response?.data?.error || 'Signup failed.');
@@ -42,21 +46,8 @@ export default function SignUp() {
     }
   };
 
-  const handleGoogleSuccess = async (res) => {
-    try {
-      const response = await googleLogin(res.credential);
-
-      const token = response.data.token;
-      localStorage.setItem('token', token);
-
-      const me = await getMe();
-      setUser(me.data);
-
-      navigate('/app/dashboard');
-    } catch (err) {
-      console.error('Google sign-up error:', err);
-      alert(err?.response?.data?.error || 'Google sign-up failed.');
-    }
+  const handleGoogleRedirect = () => {
+    window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${REDIRECT_URI}&response_type=code&scope=${SCOPE}&access_type=offline&prompt=consent`;
   };
 
   return (
@@ -104,22 +95,22 @@ export default function SignUp() {
           </div>
 
           <div className="google-button-wrapper">
-            <GoogleLogin
-              onSuccess={handleGoogleSuccess}
-              onError={() => console.log('Google Login Failed')}
-              theme="outline"
-              size="large"
-              shape="rectangular"
-              text="signin_with"
-              useOneTap={false}
-              containerProps={{
-                style: {
+            <div>
+              <button
+                onClick={handleGoogleRedirect}
+                className="auth-button"
+                style={{
                   width: '100%',
-                  display: 'flex',
-                  justifyContent: 'center'
-                }
-              }}
-            />
+                  backgroundColor: 'white',
+                  color: '#333',
+                  border: '1px solid #ccc',
+                  marginTop: 0,
+                }}
+                disabled={loading}
+              >
+                Continue with Google
+              </button>
+            </div>
           </div>
 
           <p style={{ marginTop: '1.5rem', textAlign: 'left', fontSize: '0.95rem' }}>

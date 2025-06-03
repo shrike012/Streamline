@@ -1,24 +1,17 @@
 import React from 'react';
-import { Link, useLocation } from 'react-router-dom';
 import '../styles/sidebar.css';
 
-export default function Sidebar() {
-  const location = useLocation();
-
+const Sidebar = () => {
   return (
-    <aside className="sidebar">
-      <div className="sidebar-logo">
-        <img src="/favicon.ico" alt="logo" className="sidebar-logo-img" />
-        <span className="sidebar-logo-text">Streamline</span>
-      </div>
-      <nav className="sidebar-nav">
-        <Link to="/dashboard" className={location.pathname === '/dashboard' ? 'active' : ''}>
-          Dashboard
-        </Link>
-        <Link to="/settings" className={location.pathname === '/settings' ? 'active' : ''}>
-          Settings
-        </Link>
-      </nav>
-    </aside>
+    <div className="sidebar">
+      <div className="sidebar-section">Dashboard</div>
+      <div className="sidebar-section">My Channels</div>
+      <div className="sidebar-section">Competitors</div>
+      <div className="sidebar-section">Idea Generator</div>
+      <div className="sidebar-section">Packaging Generator</div>
+      <div className="sidebar-section">Bookmarks</div>
+    </div>
   );
-}
+};
+
+export default Sidebar;
