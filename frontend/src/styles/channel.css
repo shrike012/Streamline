@@ -1,0 +1,23 @@
+.analyze-form {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 2rem;
+}
+
+.analyze-form input {
+  flex: 1;
+  padding: 0.6rem;
+  border: 1px solid #333;
+  background-color: #14181c;
+  color: white;
+  border-radius: 6px;
+}
+
+.analyze-form button {
+  padding: 0.6rem 1rem;
+  background-color: #0972ce;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}

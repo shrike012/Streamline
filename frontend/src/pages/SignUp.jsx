@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import {signup} from '../api/auth';
+import {getMe, signup} from '../api/auth';
 import PublicNavbar from '../components/PublicNavbar.jsx';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';

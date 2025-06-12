@@ -3,6 +3,8 @@ import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
 import SignUp from './pages/SignUp';
 import Login from './pages/Login';
+import Saved from './pages/Saved.jsx';
+import Channel from './pages/Channel.jsx';
 import AppLayout from './layouts/AppLayout';
 import PublicLayout from './layouts/PublicLayout';
 import RequireAuth from './components/RequireAuth';
@@ -34,7 +36,8 @@ function App() {
           }
         >
           <Route path="dashboard" element={<Dashboard />} />
-          {/* Add more app pages here */}
+          <Route path="saved" element={<Saved />} />
+          <Route path="channel" element={<Channel />} />
         </Route>
 
       </Routes>

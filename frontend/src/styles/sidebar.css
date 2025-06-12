@@ -1,21 +1,103 @@
 .sidebar {
   position: fixed;
-  top: 0;
-  left: 0;
-  height: 100vh;
-  width: 70px;
-  background-color: #b19cd9;
+  top: 6.5rem;
+  left: 2rem;
+  width: 220px;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  padding: 1rem 0;
-  border-top-right-radius: 16px;
-  border-bottom-right-radius: 16px;
   gap: 2rem;
   z-index: 999;
 }
 
-.sidebar-section {
-  font-size: 1.5rem;
+.sidebar-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.sidebar-heading {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #888;
+  margin-bottom: 0.5rem;
+  text-transform: uppercase;
+  padding-left: 0.5rem;
+  letter-spacing: 0.04em;
+}
+
+.sidebar-button {
+  display: flex;
+  text-decoration: none;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 1rem;
+  background-color: #1a1d21;
+  color: #e5e5e5;
+  font-size: 0.9rem;
+  font-weight: 500;
+  border-radius: 999px;
+  border: 1px solid #333;
   cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.sidebar-button:hover {
+  background-color: #2a2e34;
+  color: #fff;
+}
+
+.sidebar-button.active {
+  background-color: #d1551c;
+  color: #fff;
+  border-color: transparent;
+}
+
+.sidebar-icon {
+  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Hide sidebar completely on mobile unless open */
+.sidebar.mobile {
+  display: none;
+}
+
+/* Show it as overlay when open */
+.sidebar.mobile.open {
+  display: flex;
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  width: 280px;
+  padding: 6.5rem 1.7rem 2rem 2rem;
+  background-color: #14181c;
+  box-shadow: 2px 0 10px rgba(0, 0, 0, 0.4);
+  z-index: 1001;
+  flex-direction: column;
+}
+
+/* Hamburger button */
+.sidebar-toggle {
+  position: fixed;
+  top: 1.25rem;
+  left: 1.25rem;
+  z-index: 1002;
+  background: none;
+  border: none;
+  color: white;
+  font-size: 1.75rem;
+  cursor: pointer;
+}
+
+.sidebar-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 1000;
 }

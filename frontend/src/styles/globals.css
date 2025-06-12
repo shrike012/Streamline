@@ -11,11 +11,9 @@ html, body {
   line-height: 1.6;
 }
 
-.container {
-  max-width: 1200px;
-  width: 100%;
-  margin: 0 auto;
-  padding: 0 1rem;
+
+.with-sidebar {
+  margin-left: 252px;
 }
 
 .heading {
@@ -27,7 +25,7 @@ html, body {
 
 .text-secondary {
   font-size: 1.25rem;
-  color: #737b8c;
+  color: #888;
   max-width: 700px;
   margin: 0 auto 2rem;
 }
@@ -60,4 +58,42 @@ input:focus {
   font-size: 0.85rem;
   margin: 0;
   line-height: 1.2;
+}
+
+/* Layout & Grid */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, max-content));
+  justify-content: start;
+  gap: 1.5rem;
+}
+
+.page-container {
+  padding: 4.2rem 3rem 3rem 3rem;
+}
+
+.page-section {
+  margin-bottom: 3rem;
+}
+
+/* Typography */
+.section-title,
+.section-heading {
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+  color: #ccc;
+}
+
+/* Card Styling */
+.work-card {
+  background-color: #1f2937;
+  padding: 1rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  transition: background-color 0.2s ease;
+}
+
+.work-card:hover {
+  background-color: #2a3443;
 }

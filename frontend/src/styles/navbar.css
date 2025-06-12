@@ -1,10 +1,11 @@
 .navbar {
   background-color: #14181c;
-  padding: 1rem 2rem;
+  padding: 0.5rem 2rem;
   position: fixed;
   top: 0;
   width: 100%;
-  z-index: 1000;
+  z-index: 1100;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .navbar-content {
@@ -14,38 +15,84 @@
   width: 100%;
 }
 
-/* LEFT: Logo */
 .navbar-logo {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   text-decoration: none;
+  color: #888;
+}
+
+.navbar-logo:hover .logo-text {
   color: white;
 }
 
 .logo-text {
   font-size: 2rem;
+  font-weight: 700;
+  color: #888;
+  transition: color 0.2s ease-in-out;
 }
 
-/* CENTER (desktop only): Nav links */
+.logo-img {
+  height: 50px;
+}
+
+.navbar-left,
+.navbar-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.menu-toggle {
+  display: none;
+  background: none;
+  border: none;
+  font-size: 1.8rem;
+  color: #888;
+  cursor: pointer;
+}
+
+.nav-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: gray;
+  height: 20px;
+  width: 20px;
+}
+
 .navbar-links {
   display: flex;
   align-items: center;
   gap: 1.5rem;
 }
 
-/* RIGHT: Hamburger toggle */
-.menu-toggle {
-  display: none;
-  background: none;
-  border: none;
-  font-size: 1.8rem;
-  color: white;
-  cursor: pointer;
+.settings-wrapper {
+  position: relative;
 }
 
-/* Button */
-button.primary {
+.settings-dropdown {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  background-color: #1f2937;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  white-space: nowrap;
+  z-index: 999;
+}
+
+.settings-dropdown button {
+  background: none;
+  border: none;
+  color: white;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+
+.primary {
   background-color: #0972ce;
   color: white;
   padding: 0.6rem 1.5rem;
@@ -55,30 +102,48 @@ button.primary {
   cursor: pointer;
 }
 
-/* === Mobile Responsiveness === */
-@media (max-width: 768px) {
-  .navbar-links {
-    display: none;
-  }
-
-  .menu-toggle {
-    display: block;
-  }
-}
-
-/* Fullscreen mobile menu */
+/* === Mobile Menu === */
 .mobile-menu {
   position: fixed;
   top: 0;
   left: 0;
   width: 100vw;
   height: 100vh;
-  background-color: #101418;
-  color: white;
+  background-color: #14181c;
+  color: #888;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
   gap: 2rem;
   z-index: 999;
+}
+
+/* === Type-Specific Rules === */
+.auth-navbar .menu-toggle {
+  display: none;
+}
+
+@media (max-width: 1400px) {
+  .auth-navbar .menu-toggle {
+    display: block;
+  }
+}
+
+.public-navbar .navbar-links {
+  display: flex;
+}
+
+.public-navbar .menu-toggle {
+  display: none;
+}
+
+@media (max-width: 768px) {
+  .public-navbar .navbar-links {
+    display: none;
+  }
+
+  .public-navbar .menu-toggle {
+    display: block;
+  }
 }

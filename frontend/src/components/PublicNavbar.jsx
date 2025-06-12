@@ -8,28 +8,24 @@ export default function PublicNavbar() {
 
   return (
     <>
-      <header className="navbar">
+      <header className="navbar public-navbar">
         <div className="navbar-content">
           <a href="/" className="navbar-logo">
-            <img src="/favicon.ico" alt="logo" className="logo-img" />
+            <img src="/logo.ico" alt="logo" className="logo-img" />
             <span className="logo-text">Streamline</span>
           </a>
 
-          <nav className={`navbar-links ${menuOpen ? 'hidden-on-mobile' : ''}`}>
+          <nav className="navbar-links">
             <span className="nav-link" onClick={() => navigate('/login')}>Log in</span>
-            <button className="primary" onClick={() => navigate('/signup')}>
-              Create an account
-            </button>
+            <button className="primary" onClick={() => navigate('/signup')}>Create an account</button>
           </nav>
 
-          {/* Hamburger / X */}
           <button className="menu-toggle" onClick={() => setMenuOpen(!menuOpen)}>
             {menuOpen ? '✕' : '☰'}
           </button>
         </div>
       </header>
 
-      {/* Fullscreen Mobile Menu */}
       {menuOpen && (
         <div className="mobile-menu">
           <span className="nav-link" onClick={() => { setMenuOpen(false); navigate('/login'); }}>Log in</span>

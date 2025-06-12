@@ -97,7 +97,6 @@ def google_callback():
 
     token_res = requests.post(token_url, data=data)
     token_data = token_res.json()
-    print("Token exchange response:", token_data)
 
     if "error" in token_data:
         logging.warning("Google token exchange failed: %s", token_data)

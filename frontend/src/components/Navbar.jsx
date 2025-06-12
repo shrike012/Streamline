@@ -1,22 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { FiBell, FiMoreVertical } from 'react-icons/fi';
+import { FiBell, FiMoreVertical, FiMenu } from 'react-icons/fi';
 import '../styles/navbar.css';
 
-const Navbar = () => {
-  const [menuOpen, setMenuOpen] = useState(false);
+const Navbar = ({ toggleSidebar }) => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef();
-  const navigate = useNavigate();
   const { user, logout, loading } = useAuth();
 
-  const handleNav = (path) => {
-    navigate(path);
-    setMenuOpen(false);
-  };
-
-  // Close dropdown if clicked outside
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
@@ -29,76 +21,42 @@ const Navbar = () => {
 
   if (loading) {
     return (
-      <header className="navbar">
-        <div className="navbar-content">
-          <span>Loading...</span>
-        </div>
+      <header className="navbar auth-navbar">
+        <div className="navbar-content">Loading...</div>
       </header>
     );
   }
 
   return (
-    <>
-      <header className="navbar">
-        <div className="navbar-content">
-          <Link to="/" className="navbar-logo">
-            <img src="/favicon.ico" alt="logo" className="logo-img" />
+    <header className="navbar auth-navbar">
+      <div className="navbar-content">
+        <div className="navbar-left">
+          <button className="menu-toggle" onClick={toggleSidebar}>
+            <FiMenu size={20} />
+          </button>
+          <Link to="/app/dashboard" className="navbar-logo">
+            <img src="/logo.ico" alt="logo" className="logo-img" />
             <span className="logo-text">Streamline</span>
           </Link>
+        </div>
 
-          <nav className="navbar-links">
-            {user ? (
-              <>
-                <FiBell className="nav-icon" size={20} />
-                <div className="nav-dropdown" ref={dropdownRef}>
-                  <FiMoreVertical
-                    className="nav-icon"
-                    size={20}
-                    onClick={() => setDropdownOpen(!dropdownOpen)}
-                    style={{ cursor: 'pointer' }}
-                  />
-                  {dropdownOpen && (
-                    <div className="dropdown-menu">
-                      <span onClick={logout}>Logout</span>
-                    </div>
-                  )}
-                </div>
-              </>
-            ) : (
-              <>
-                <span className="nav-link" onClick={() => navigate('/login')}>Log in</span>
-                <button className="primary" onClick={() => navigate('/signup')}>
-                  Create an account
-                </button>
-              </>
+        <div className="navbar-right">
+          <FiBell className="nav-icon" size={20} />
+          <div className="settings-wrapper" ref={dropdownRef}>
+            <FiMoreVertical
+              className="nav-icon"
+              size={20}
+              onClick={() => setDropdownOpen(!dropdownOpen)}
+            />
+            {dropdownOpen && (
+              <div className="settings-dropdown">
+                <button onClick={logout}>Logout</button>
+              </div>
             )}
-          </nav>
-
-          <button className="menu-toggle" onClick={() => setMenuOpen(!menuOpen)}>
-            {menuOpen ? '✕' : '☰'}
-          </button>
+          </div>
         </div>
-      </header>
-
-      {/* Mobile dropdown menu */}
-      {menuOpen && (
-        <div className="mobile-menu">
-          {user ? (
-            <>
-              <span className="nav-link" onClick={() => handleNav('/dashboard')}>Dashboard</span>
-              <button className="primary" onClick={logout}>Logout</button>
-            </>
-          ) : (
-            <>
-              <span className="nav-link" onClick={() => handleNav('/login')}>Log in</span>
-              <button className="primary" onClick={() => handleNav('/signup')}>
-                Create an account
-              </button>
-            </>
-          )}
-        </div>
-      )}
-    </>
+      </div>
+    </header>
   );
 };
 
