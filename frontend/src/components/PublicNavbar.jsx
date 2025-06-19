@@ -1,10 +1,183 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import {
+  getMe,
+  login,
+  signup,
+  requestPasswordReset,
+  resetPassword,
+} from '../api/apiRoutes.js';
+import Modal from './Modal.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
 import '../styles/navbar.css';
+
+const Divider = () => (
+  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', margin: '1.25rem 0' }}>
+    <span style={{ flex: 1, height: '1px', background: '#555' }} />
+    <span style={{ fontSize: '0.85rem', color: '#888' }}>OR</span>
+    <span style={{ flex: 1, height: '1px', background: '#555' }} />
+  </div>
+);
+
+const GoogleAuthButton = ({ onClick, disabled }) => (
+  <button
+    onClick={onClick}
+    disabled={disabled}
+    style={{
+      width: '100%',
+      backgroundColor: 'white',
+      color: '#333',
+      border: '1px solid #ccc',
+      padding: '0.75rem 1.5rem',
+      borderRadius: '8px',
+      fontSize: '1rem',
+      fontWeight: 600,
+      cursor: 'pointer',
+      marginTop: 0,
+    }}
+  >
+    Continue with Google
+  </button>
+);
+
+const PromptLink = ({ question, linkText, onClick }) => (
+  <p style={{ marginTop: '1.5rem', textAlign: 'left', fontSize: '0.95rem' }}>
+    {question} <span onClick={onClick} style={{ color: '#007bff', textDecoration: 'underline', cursor: 'pointer' }}>{linkText}</span>
+  </p>
+);
+
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+const REDIRECT_URI = import.meta.env.VITE_GOOGLE_REDIRECT_URI;
+const SCOPE = "https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile openid";
 
 export default function PublicNavbar() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [showLogin, setShowLogin] = useState(false);
+  const [showSignup, setShowSignup] = useState(false);
+  const [form, setForm] = useState({ email: '', password: '' });
+  const [errors, setErrors] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotMessage, setForgotMessage] = useState('');
+  const [resetToken, setResetToken] = useState('');
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [resetMessage, setResetMessage] = useState('');
+
   const navigate = useNavigate();
+  const location = useLocation();
+  const { setUser } = useAuth();
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get("token");
+    const hasGoogleCode = params.get("code");
+
+    getMe()
+      .then(res => {
+        setUser(res.data);
+        navigate('/app/dashboard');
+      })
+      .catch(() => {});
+
+    if (hasGoogleCode) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+    if (token) {
+      setResetToken(token);
+      setShowResetModal(true);
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+  }, [location, navigate, setUser]);
+
+  const closeModals = () => {
+    setShowLogin(false);
+    setShowSignup(false);
+    setErrors({});
+    setForm({ email: '', password: '' });
+  };
+
+  const handleChange = (e) => {
+    setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  const validate = () => {
+    if (!form.email || !form.password) {
+      setErrors({ form: 'Invalid credentials.' });
+      return false;
+    }
+    return true;
+  };
+
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setForgotMessage('');
+
+    try {
+      await requestPasswordReset(forgotEmail);
+      setForgotMessage("If this email is registered, a reset link has been sent.");
+    } catch {
+      setForgotMessage("Something went wrong. Try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setResetMessage('');
+
+    try {
+      await resetPassword({ token: resetToken, password: newPassword });
+      setResetMessage("Password reset successful. You can now log in.");
+    } catch {
+      setResetMessage("Reset failed. Link may be expired.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLoginSubmit = async (e) => {
+    e.preventDefault();
+    if (!validate()) return;
+    setLoading(true);
+
+    try {
+      await login(form);
+      const me = await getMe();
+      setUser(me.data);
+      navigate('/app/dashboard');
+    } catch {
+      setErrors({ form: 'Invalid credentials.' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSignupSubmit = async (e) => {
+    e.preventDefault();
+    if (!validate()) return;
+    setLoading(true);
+
+    try {
+      await signup(form);
+      const me = await getMe();
+      setUser(me.data);
+      navigate('/app/dashboard');
+    } catch {
+      setErrors({ form: 'Signup failed.' });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleRedirect = () => {
+    window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${REDIRECT_URI}&response_type=code&scope=${SCOPE}&access_type=offline&prompt=consent`;
+  };
 
   return (
     <>
@@ -15,25 +188,92 @@ export default function PublicNavbar() {
             <span className="logo-text">Streamline</span>
           </a>
 
-          <nav className="navbar-links">
-            <span className="nav-link" onClick={() => navigate('/login')}>Log in</span>
-            <button className="primary" onClick={() => navigate('/signup')}>Create an account</button>
-          </nav>
+          <div className="navbar-section">
+            <nav className="navbar-links">
+              <span className="nav-link" onClick={() => setShowLogin(true)}>Log in</span>
+              <button className="button-primary" onClick={() => setShowSignup(true)}>Create an account</button>
+            </nav>
 
-          <button className="menu-toggle" onClick={() => setMenuOpen(!menuOpen)}>
-            {menuOpen ? '✕' : '☰'}
-          </button>
+            <button className="menu-toggle" onClick={() => setMenuOpen(!menuOpen)}>
+              {menuOpen ? '✕' : '☰'}
+            </button>
+          </div>
         </div>
       </header>
 
       {menuOpen && (
         <div className="mobile-menu">
-          <span className="nav-link" onClick={() => { setMenuOpen(false); navigate('/login'); }}>Log in</span>
-          <button className="primary" onClick={() => { setMenuOpen(false); navigate('/signup'); }}>
-            Create an account
-          </button>
+          <span className="nav-link" onClick={() => { setMenuOpen(false); setShowLogin(true); }}>Log in</span>
+          <button className="primary" onClick={() => { setMenuOpen(false); setShowSignup(true); }}>Create an account</button>
         </div>
       )}
+
+      <Modal
+        isOpen={showLogin}
+        onClose={closeModals}
+        title="Log In"
+        fields={[{ label: 'Email', name: 'email', type: 'email' }, { label: 'Password', name: 'password', type: 'password' }]}
+        formData={form}
+        onChange={handleChange}
+        onSubmit={handleLoginSubmit}
+        errors={errors}
+        loading={loading}
+        submitLabel="Log In"
+        actions={
+          <>
+            <PromptLink question="Forgot your password?" linkText="Reset it" onClick={() => { closeModals(); setShowForgotPassword(true); }} />
+            <Divider />
+            <GoogleAuthButton onClick={handleGoogleRedirect} disabled={loading} />
+            <PromptLink question="Don’t have an account?" linkText="Sign up" onClick={() => { closeModals(); setShowSignup(true); }} />
+          </>
+        }
+      />
+
+      <Modal
+        isOpen={showSignup}
+        onClose={closeModals}
+        title="Sign Up"
+        fields={[{ label: 'Email', name: 'email', type: 'email' }, { label: 'Password', name: 'password', type: 'password' }]}
+        formData={form}
+        onChange={handleChange}
+        onSubmit={handleSignupSubmit}
+        errors={errors}
+        loading={loading}
+        submitLabel="Sign Up"
+        actions={
+          <>
+            <Divider />
+            <GoogleAuthButton onClick={handleGoogleRedirect} disabled={loading} />
+            <PromptLink question="Already have an account?" linkText="Log in" onClick={() => { closeModals(); setShowLogin(true); }} />
+          </>
+        }
+      />
+
+      <Modal
+        isOpen={showForgotPassword}
+        onClose={() => { setShowForgotPassword(false); setForgotEmail(''); setForgotMessage(''); }}
+        title="Reset Password"
+        fields={[{ label: 'Email', name: 'forgotEmail', type: 'email' }]}
+        formData={{ forgotEmail }}
+        onChange={(e) => setForgotEmail(e.target.value)}
+        onSubmit={handleForgotPassword}
+        errors={forgotMessage ? { form: forgotMessage } : {}}
+        loading={loading}
+        submitLabel="Send Reset Link"
+      />
+
+      <Modal
+        isOpen={showResetModal}
+        onClose={() => { setShowResetModal(false); setResetToken(''); setNewPassword(''); setResetMessage(''); }}
+        title="Set a New Password"
+        fields={[{ label: 'New Password', name: 'newPassword', type: 'password' }]}
+        formData={{ newPassword }}
+        onChange={(e) => setNewPassword(e.target.value)}
+        onSubmit={handleResetPassword}
+        errors={resetMessage ? { form: resetMessage } : {}}
+        loading={loading}
+        submitLabel="Reset Password"
+      />
     </>
   );
 }

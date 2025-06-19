@@ -5,10 +5,9 @@
 # Python
 venv/
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
 *.log
+*.pyd
 backend/.env
 
 # Node/React
@@ -31,3 +30,7 @@ frontend/package-lock.json
 # System
 .DS_Store
 Thumbs.db
+
+# Logs (only keep .gitkeep)
+logs/*
+!logs/.gitkeep

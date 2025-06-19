@@ -24,7 +24,7 @@ const AppLayout = () => {
       <Navbar isMobile={isMobile} toggleSidebar={toggleSidebar} />
       <Sidebar isOpen={sidebarOpen} toggleSidebar={toggleSidebar} isMobile={isMobile} />
 
-      <div className={`main-content ${isMobile ? '' : 'with-sidebar'}`}>
+      <div className="main-content">
         <Outlet />
       </div>
     </>

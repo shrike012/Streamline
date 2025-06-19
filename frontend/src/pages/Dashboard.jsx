@@ -1,56 +1,56 @@
-import { useEffect } from 'react';
-import { getMe } from '../api/auth';
+import { useEffect, useState } from 'react';
+import { useChannel } from '../context/ChannelContext';
 import VideoCard from '../components/VideoCard';
-import VideoGrid from '../components/VideoGrid';
+import Grid from '../components/Grid.jsx';
+import { getCompetitorVideos, getRecentWork, getTopVideos } from "../api/apiRoutes.js";
 
 function Dashboard() {
+  const { selectedChannel } = useChannel();
 
-  const competitorVideos = Array(5).fill({
-    title: "Hybrid LLMs with Gemma",
-    thumbnail: "https://i.ytimg.com/vi/PvKEHPbZ4-Y/hqdefault.jpg",
-    views: "97K views",
-    timeAgo: "3 days ago",
-    length: "14:20",
-    videoId: "PvKEHPbZ4-Y",
-  });
+  const [competitorVideos, setCompetitorVideos] = useState([]);
+  const [yourTopVideos, setYourTopVideos] = useState([]);
+  const [recentWork, setRecentWork] = useState([]);
+  const [error, setError] = useState(null);
 
-  const yourTopVideos = [
-    {
-      title: 'Your Video 1',
-      thumbnail: '',
-      views: '500K views',
-      timeAgo: '1 week ago',
-      length: '10:02',
-      videoId: 'abc123',
-    },
-    {
-      title: 'Your Video 2',
-      thumbnail: '',
-      views: '1.1M views',
-      timeAgo: '2 weeks ago',
-      length: '12:45',
-      videoId: 'def456',
-    },
-  ];
+  useEffect(() => {
+    if (!selectedChannel || !selectedChannel.channel_id) return;
+
+    const fetchDashboardData = async () => {
+      try {
+        const [comp, top, recent] = await Promise.all([
+          getCompetitorVideos(selectedChannel.channel_id),
+          getTopVideos(selectedChannel.channel_id),
+          // getRecentWork(selectedChannel.channel_id),
+        ]);
+
+        setCompetitorVideos(comp);
+        setYourTopVideos(top);
+        setRecentWork(recent);
+        setError(null);
+      }
+      catch (err) {
+         setError('Failed to load data. Please try again later.');
+      }
+    };
+
+    fetchDashboardData();
+  }, [selectedChannel]);
 
   return (
-    <div className="page-container">
-      <h1 className="page-title">Your Dashboard</h1>
+    <>
+      <h1>Your Dashboard</h1>
+
+      {error && <p className="error-message" style={{ color: 'red', marginBottom: '1rem' }}>{error}</p>}
 
       {/* Recently Worked-On */}
       <section className="page-section">
         <h2 className="section-title">Recently Worked On</h2>
-        <div className="card-grid">
-          <div className="work-card">Idea: "What If Rome Never Fell"</div>
-          <div className="work-card">Title: "The Most Unfair Tactics in History"</div>
-          <div className="work-card">Thumbnail: Egyptian Sandstorm</div>
-        </div>
       </section>
 
       {/* Competitors' Recent Videos */}
       <section className="page-section">
         <h2 className="section-title">Competitors' Recent Videos</h2>
-        <VideoGrid
+        <Grid
           items={competitorVideos}
           renderCard={(video, idx) => (
             <VideoCard
@@ -70,7 +70,7 @@ function Dashboard() {
       {/* Your Top Videos */}
       <section className="page-section">
         <h2 className="section-title">Your Top Videos</h2>
-        <VideoGrid
+        <Grid
           items={yourTopVideos}
           renderCard={(video, idx) => (
             <VideoCard
@@ -86,7 +86,7 @@ function Dashboard() {
           )}
         />
       </section>
-    </div>
+    </>
   );
 }
 

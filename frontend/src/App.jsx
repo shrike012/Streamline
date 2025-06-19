@@ -1,13 +1,14 @@
 import { Routes, Route } from 'react-router-dom';
 import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
-import SignUp from './pages/SignUp';
-import Login from './pages/Login';
 import Saved from './pages/Saved.jsx';
 import Channel from './pages/Channel.jsx';
+import NicheExplorer from './pages/NicheExplorer.jsx';
+import CompetitorTracker from './pages/CompetitorTracker.jsx';
 import AppLayout from './layouts/AppLayout';
 import PublicLayout from './layouts/PublicLayout';
 import RequireAuth from './components/RequireAuth';
+import ResetPassword from './pages/ResetPassword.jsx';
 import './styles/globals.css';
 
 import { GoogleOAuthProvider } from '@react-oauth/google';
@@ -22,8 +23,7 @@ function App() {
         {/* Public Layout */}
         <Route element={<PublicLayout />}>
           <Route path="/" element={<Home />} />
-          <Route path="/signup" element={<SignUp />} />
-          <Route path="/login" element={<Login />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
         </Route>
 
         {/* Authenticated App Layout */}
@@ -37,7 +37,9 @@ function App() {
         >
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="saved" element={<Saved />} />
-          <Route path="channel" element={<Channel />} />
+          <Route path="channel/:id" element={<Channel />} />
+          <Route path="niche-explorer" element={<NicheExplorer />} />
+          <Route path="competitor-tracker" element={<CompetitorTracker />} />
         </Route>
 
       </Routes>

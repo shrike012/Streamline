@@ -1,3 +1,4 @@
+/* Video Card */
 .video-card {
   display: flex;
   flex-direction: column;
@@ -58,7 +59,7 @@
   text-decoration: none;
 }
 
-/* === Hover Button Logic === */
+/* Hover Button Logic */
 .video-actions {
   position: absolute;
   top: 0.5rem;
@@ -77,6 +78,7 @@
   pointer-events: auto;
 }
 
+/* Ideate Block */
 .ideate-block {
   background-color: rgba(9, 114, 206, 0.9);
   border-radius: 16px;
@@ -89,7 +91,6 @@
   color: white;
 }
 
-/* Top row: icon + label */
 .ideate-header {
   display: flex;
   align-items: center;
@@ -104,7 +105,7 @@
   transform: translateY(-1px);
 }
 
-/* Dropdown: hidden until hover */
+/* Dropdown */
 .dropdown-menu {
   display: flex;
   flex-direction: column;
@@ -121,7 +122,7 @@
   max-height: 300px;
 }
 
-/* Buttons */
+/* Dropdown Buttons */
 .dropdown-menu button {
   background: none;
   border: none;
@@ -138,7 +139,7 @@
   background-color: rgba(255, 255, 255, 0.1);
 }
 
-/* === Modal Styling === */
+/* Modal */
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -165,7 +166,7 @@
   max-width: 90%;
 }
 
-/* Buttons that represent existing lists */
+/* List Option Button */
 .list-option-button {
   background-color: #1f2125;
   color: white;
@@ -181,7 +182,7 @@
   background-color: #2c2f34;
 }
 
-/* Action buttons (Create, Cancel, etc) */
+/* Modal Action Button */
 .modal-action-button {
   background-color: #0972ce;
   color: white;
@@ -197,7 +198,7 @@
   background-color: #0b84ea;
 }
 
-/* Optional: modal input */
+/* Modal Input */
 .modal input {
   padding: 0.5rem 0.75rem;
   border-radius: 6px;
@@ -207,6 +208,7 @@
   font-size: 0.9rem;
 }
 
+/* Placeholder Fallback */
 .placeholder-fallback {
   width: 100%;
   aspect-ratio: 16 / 9;

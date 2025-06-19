@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import VideoCard from '../components/VideoCard';
-import '../styles/saved.css';
-import { getSavedLists, updateSavedLists } from '../api/auth';
+import Grid from '../components/Grid.jsx';
+import { getSavedLists, updateSavedLists } from '../api/apiRoutes.js';
 
 function Saved() {
   const [lists, setLists] = useState([]);
@@ -37,31 +37,34 @@ function Saved() {
   };
 
   return (
-    <div className="page-container">
+    <>
       <h1>Your Saved</h1>
 
       <div className="toggle-bar">
-        <div className="toggle-buttons">
+        <div className="toggle-buttons" style={{ display: 'flex', gap: '0.5rem' }}>
           <button
-            className={activeTab === 'lists' ? 'active' : ''}
+            className={activeTab === 'lists' ? 'button-primary-sm' : 'button-ghost-sm'}
             onClick={() => setActiveTab('lists')}
           >
             Lists
           </button>
           <button
-            className={activeTab === 'notes' ? 'active' : ''}
+            className={activeTab === 'notes' ? 'button-primary-sm' : 'button-ghost-sm'}
             onClick={() => setActiveTab('notes')}
           >
             Notes
           </button>
-          <button className="plus-button" onClick={handleCreateClick}>＋</button>
+          <button className="button-ghost" onClick={handleCreateClick}>
+            ＋
+          </button>
         </div>
       </div>
 
       {activeTab === 'lists' && (
         <section className="page-section">
-          <div className="card-grid">
-            {lists.map((list, idx) => (
+          <Grid
+            items={lists}
+            renderCard={(list, idx) => (
               <VideoCard
                 key={idx}
                 title={list.name}
@@ -72,8 +75,8 @@ function Saved() {
                 videoId={null}
                 showActions={false}
               />
-            ))}
-          </div>
+            )}
+          />
         </section>
       )}
 
@@ -84,7 +87,7 @@ function Saved() {
           </p>
         </section>
       )}
-    </div>
+    </>
   );
 }
 

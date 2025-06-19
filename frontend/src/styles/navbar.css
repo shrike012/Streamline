@@ -1,6 +1,7 @@
+/* Base Navbar */
 .navbar {
   background-color: #14181c;
-  padding: 0.5rem 2rem;
+  padding: 0.7rem 2rem;
   position: fixed;
   top: 0;
   width: 100%;
@@ -12,7 +13,12 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  width: 100%;
+}
+
+.navbar-links {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
 }
 
 .navbar-logo {
@@ -20,11 +26,6 @@
   align-items: center;
   gap: 0.5rem;
   text-decoration: none;
-  color: #888;
-}
-
-.navbar-logo:hover .logo-text {
-  color: white;
 }
 
 .logo-text {
@@ -34,108 +35,108 @@
   transition: color 0.2s ease-in-out;
 }
 
+.navbar-logo:hover .logo-text {
+  color: white;
+}
+
 .logo-img {
   height: 50px;
 }
 
-.navbar-left,
-.navbar-right {
+.navbar-section {
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.8rem;
+}
+
+/* Account Menu */
+.account-menu {
+  position: relative;
+  margin-left: 1rem;
+  cursor: pointer;
+}
+
+.account-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: #1f1f1f;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.account-avatar img {
+  width: 100%;
+  height: 100%;
+}
+
+.account-dropdown {
+  position: absolute;
+  top: 120%;
+  right: 0;
+  background-color: #1f2937;
+  border: 1px solid #333;
+  border-radius: 8px;
+  min-width: 180px;
+  z-index: 999;
+  padding: 0.4rem 0;
+}
+
+.account-menu-item {
+  width: 100%;
+  background: none;
+  text-decoration: none;
+  border: none;
+  color: white;
+  padding: 8px 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  border-radius: 6px;
+  font-size: 14px;
+  transition: background 0.2s ease;
+}
+
+.account-menu-item:hover {
+  background-color: #2c2c2c;
+}
+
+.channel-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+}
+
+/* Search Results Modal */
+.search-results {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 10px;
+}
+
+/* Misc */
+.nav-icon {
+  color: gray;
 }
 
 .menu-toggle {
-  display: none;
   background: none;
   border: none;
   font-size: 1.8rem;
   color: #888;
   cursor: pointer;
-}
-
-.nav-icon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: gray;
-  height: 20px;
-  width: 20px;
-}
-
-.navbar-links {
-  display: flex;
-  align-items: center;
-  gap: 1.5rem;
-}
-
-.settings-wrapper {
-  position: relative;
-}
-
-.settings-dropdown {
-  position: absolute;
-  top: calc(100% + 0.5rem);
-  right: 0;
-  background-color: #1f2937;
-  padding: 0.5rem 1rem;
-  border-radius: 6px;
-  white-space: nowrap;
-  z-index: 999;
-}
-
-.settings-dropdown button {
-  background: none;
-  border: none;
-  color: white;
-  cursor: pointer;
-  font-size: 0.95rem;
-}
-
-.primary {
-  background-color: #0972ce;
-  color: white;
-  padding: 0.6rem 1.5rem;
-  border: none;
-  border-radius: 8px;
-  font-size: 1rem;
-  cursor: pointer;
-}
-
-/* === Mobile Menu === */
-.mobile-menu {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background-color: #14181c;
-  color: #888;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  gap: 2rem;
-  z-index: 999;
-}
-
-/* === Type-Specific Rules === */
-.auth-navbar .menu-toggle {
   display: none;
 }
 
+/* Mobile */
 @media (max-width: 1400px) {
   .auth-navbar .menu-toggle {
     display: block;
   }
-}
-
-.public-navbar .navbar-links {
-  display: flex;
-}
-
-.public-navbar .menu-toggle {
-  display: none;
 }
 
 @media (max-width: 768px) {

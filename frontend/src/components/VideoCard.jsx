@@ -1,7 +1,7 @@
 import '../styles/videocard.css';
 import { FaLightbulb } from 'react-icons/fa';
 import { useState } from 'react';
-import { getSavedLists, updateSavedLists } from '../api/auth';
+import { getSavedLists, updateSavedLists } from '../api/apiRoutes.js';
 
 function VideoCard({
   title,

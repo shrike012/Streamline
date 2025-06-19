@@ -1,8 +1,10 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import { getMe, logout as logoutRequest } from '../api/auth';
+import { getMe, logout as logoutRequest } from '../api/apiRoutes.js';
 import { useNavigate } from 'react-router-dom';
 
 const AuthContext = createContext();
+
+export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
@@ -36,7 +38,8 @@ export const AuthProvider = ({ children }) => {
       console.error("Logout failed:", err);
     }
     setUser(null);
-    navigate('/login');
+    localStorage.removeItem('streamline_selected_channel');
+    navigate('/');
   };
 
   return (
@@ -45,5 +48,3 @@ export const AuthProvider = ({ children }) => {
     </AuthContext.Provider>
   );
 };
-
-export const useAuth = () => useContext(AuthContext);

@@ -12,10 +12,12 @@ services:
       PYTHONUNBUFFERED: 1
     volumes:
       - ./backend:/app
+      - ./logs:/logs
 
   mongo:
     image: mongo:6.0
     container_name: streamline-mongo
+    command: ["mongod", "--quiet", "--logpath", "/dev/null", "--logappend"]
     ports:
       - "27017:27017"
     volumes:

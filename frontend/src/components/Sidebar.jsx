@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { FiGrid, FiUsers, FiZap, FiType, FiImage, FiBookmark, FiTv, FiBarChart2 } from 'react-icons/fi';
-
+import { FiUsers, FiZap, FiType, FiImage, FiBookmark, FiTv, } from 'react-icons/fi';
 import '../styles/sidebar.css';
 
 const Sidebar = ({ isOpen, toggleSidebar }) => {
@@ -25,14 +24,14 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
             <FiBookmark className="sidebar-icon" />
             Dashboard
           </Link>
-          <div className="sidebar-button">
+          <Link to="/app/niche-explorer" className="sidebar-button">
             <FiTv className="sidebar-icon" />
-            My Channels
-          </div>
-          <div className="sidebar-button">
+            Niche Explorer
+          </Link>
+          <Link to="/app/competitor-tracker" className="sidebar-button">
             <FiUsers className="sidebar-icon" />
-            Competitors
-          </div>
+            Competitor Tracker
+          </Link>
           <Link to="/app/saved" className="sidebar-button">
             <FiBookmark className="sidebar-icon" />
             Saved
@@ -41,10 +40,6 @@ const Sidebar = ({ isOpen, toggleSidebar }) => {
 
         <div className="sidebar-group">
           <div className="sidebar-heading">Tools</div>
-          <Link to="/app/channel" className="sidebar-button">
-            <FiBarChart2 className="sidebar-icon" />
-            Channel Analyzer
-          </Link>
           <div className="sidebar-button">
             <FiZap className="sidebar-icon" />
             Idea Generator
