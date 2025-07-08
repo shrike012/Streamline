@@ -14,8 +14,8 @@ def get_settings(data):
 
     return jsonify({
         "email": user["email"],
-        "notifications": user.get("notifications_enabled", True),
-        "auth_provider": user.get("auth_provider", "local")
+        "notificationsEnabled": user.get("notificationsEnabled", True),
+        "authProvider": user.get("authProvider", "local")
     })
 
 
@@ -84,7 +84,7 @@ def update_notifications(data):
     if not isinstance(enabled, bool):
         return jsonify({"error": "Invalid value"}), 400
 
-    mongo.db.users.update_one({"email": data["email"]}, {"$set": {"notifications_enabled": enabled}})
+    mongo.db.users.update_one({"email": data["email"]}, {"$set": {"notificationsEnabled": enabled}})
     return jsonify({"message": "Notifications setting updated"}), 200
 
 

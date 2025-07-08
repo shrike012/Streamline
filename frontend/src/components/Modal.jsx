@@ -1,5 +1,5 @@
-import React from 'react';
-import '../styles/modal.css';
+import React, { useEffect, useRef } from "react";
+import "../styles/modal.css";
 
 export default function Modal({
   isOpen,
@@ -12,19 +12,57 @@ export default function Modal({
   onSubmit,
   loading,
   actions,
-  submitLabel = 'Submit',
+  submitLabel = "Submit",
   children,
   submitDisabled = false,
 }) {
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      document.body.classList.add("no-scroll");
+    } else {
+      document.body.classList.remove("no-scroll");
+    }
+    return () => document.body.classList.remove("no-scroll");
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (isOpen && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [isOpen]);
+
+  // Close on Escape
+  useEffect(() => {
+    if (isOpen) {
+      const handleKeyDown = (e) => {
+        if (e.key === "Escape") {
+          onClose();
+        }
+      };
+      window.addEventListener("keydown", handleKeyDown);
+
+      return () => {
+        window.removeEventListener("keydown", handleKeyDown);
+      };
+    }
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const shouldShowForm =
-    (fields && fields.length > 0) ||
-    children ||
-    submitLabel;
+    (fields && fields.length > 0) || children || submitLabel;
 
   return (
-    <div className="overlay-center" onClick={onClose}>
+    <div
+      className="overlay-center"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      tabIndex={-1}
+      style={{ pointerEvents: "auto", zIndex: 9999 }}
+    >
       <div className="form-wrapper" onClick={(e) => e.stopPropagation()}>
         <button className="close-button" onClick={onClose}>
           &times;
@@ -35,20 +73,28 @@ export default function Modal({
         {shouldShowForm && (
           <form onSubmit={onSubmit} className="form-container">
             {children ? (
-              children
+              React.Children.map(children, (child, index) =>
+                index === 0 &&
+                React.isValidElement(child) &&
+                child.type === "input"
+                  ? React.cloneElement(child, { ref: inputRef })
+                  : child,
+              )
             ) : (
               <>
-                {fields.map(({ label, name, type, options }) => (
+                {fields.map(({ label, name, type, options }, idx) => (
                   <div className="form-group" key={name}>
-                    <label htmlFor={name} className="form-label">{label}</label>
+                    <label htmlFor={name} className="form-label">
+                      {label}
+                    </label>
 
-                    {type === 'select' ? (
+                    {type === "select" ? (
                       <select
                         id={name}
                         name={name}
-                        value={formData[name] || ''}
+                        value={formData[name] || ""}
                         onChange={onChange}
-                        className={`form-input${errors[name] ? ' error' : ''}`}
+                        className={`form-input${errors[name] ? " error" : ""}`}
                       >
                         <option value="">-- Select --</option>
                         {options.map((opt) => (
@@ -59,12 +105,13 @@ export default function Modal({
                       </select>
                     ) : (
                       <input
-                        type={type || 'text'}
+                        ref={idx === 0 ? inputRef : null} // Focus first input from fields
+                        type={type || "text"}
                         id={name}
                         name={name}
-                        value={formData[name] || ''}
+                        value={formData[name] || ""}
                         onChange={onChange}
-                        className={`form-input${errors[name] ? ' error' : ''}`}
+                        className={`form-input${errors[name] ? " error" : ""}`}
                       />
                     )}
 
@@ -74,9 +121,7 @@ export default function Modal({
                   </div>
                 ))}
 
-                {errors.form && (
-                  <p className="error-message">{errors.form}</p>
-                )}
+                {errors.form && <p className="error-message">{errors.form}</p>}
 
                 {submitLabel && (
                   <button
@@ -84,7 +129,7 @@ export default function Modal({
                     className="button-primary"
                     disabled={loading || submitDisabled}
                   >
-                    {loading ? 'Loading...' : submitLabel}
+                    {loading ? "Loading..." : submitLabel}
                   </button>
                 )}
               </>

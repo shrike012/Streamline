@@ -1,9 +1,9 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect } from "react";
 
 const ChannelContext = createContext();
 
 export const ChannelProvider = ({ children }) => {
-  const LOCAL_STORAGE_KEY = 'streamline_selected_channel';
+  const LOCAL_STORAGE_KEY = "streamline_selected_channel";
   const [selectedChannel, setSelectedChannel] = useState(null);
 
   useEffect(() => {
@@ -12,10 +12,17 @@ export const ChannelProvider = ({ children }) => {
   }, []);
 
   const updateChannel = (channel) => {
-    setSelectedChannel(channel);
     if (channel) {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(channel));
+      const channelInfo = {
+        channelId: channel.channelId,
+        title: channel.channelTitle,
+        avatar: channel.avatar,
+        handle: channel.handle,
+      };
+      setSelectedChannel(channelInfo);
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(channelInfo));
     } else {
+      setSelectedChannel(null);
       localStorage.removeItem(LOCAL_STORAGE_KEY);
     }
   };

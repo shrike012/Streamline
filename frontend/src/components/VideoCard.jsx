@@ -1,183 +1,279 @@
-import '../styles/videocard.css';
-import { FaLightbulb } from 'react-icons/fa';
-import { useState } from 'react';
-import { getSavedLists, updateSavedLists } from '../api/apiRoutes.js';
+import "../styles/videocard.css";
+import { FaLightbulb } from "react-icons/fa";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  getCollections,
+  addVideoToCollection,
+  createCollection,
+} from "../api/apiRoutes.js";
+import Modal from "./Modal";
+
+function timeAgoFromDate(dateString) {
+  const published = new Date(dateString);
+  const now = new Date();
+  const seconds = Math.floor((now - published) / 1000);
+
+  const intervals = [
+    { label: "year", seconds: 31536000 },
+    { label: "month", seconds: 2592000 },
+    { label: "day", seconds: 86400 },
+    { label: "hour", seconds: 3600 },
+    { label: "minute", seconds: 60 },
+  ];
+
+  for (const interval of intervals) {
+    const count = Math.floor(seconds / interval.seconds);
+    if (count >= 1) {
+      return `${count} ${interval.label}${count !== 1 ? "s" : ""} ago`;
+    }
+  }
+  return "just now";
+}
 
 function VideoCard({
   title,
   thumbnail,
   views,
-  timeAgo,
   length,
   videoId,
-  score,
-  isPlaylist = false,
-  videoCount = 0,
+  outlierScore,
+  publishedAt,
   link = null,
-  showActions = true,
+  channelTitle = "",
+  channelId,
+  showChannelTitle = false,
+  onRemove,
 }) {
+  const navigate = useNavigate();
   const [showModal, setShowModal] = useState(false);
-  const [showNewListPrompt, setShowNewListPrompt] = useState(false);
-  const [lists, setLists] = useState([]);
-  const [newListName, setNewListName] = useState('');
+  const [showNewCollectionPrompt, setShowNewCollectionPrompt] = useState(false);
+  const [collections, setCollections] = useState([]);
+  const [saveError, setSaveError] = useState(null);
+  const [newCollectionName, setNewCollectionName] = useState("");
 
   const videoUrl = link || `https://www.youtube.com/watch?v=${videoId}`;
-  const displayLength = isPlaylist
-    ? `${videoCount} video${videoCount !== 1 ? 's' : ''}`
-    : length;
-
-  const fallbackThumbnail = '/img/placeholder.png';
+  const fallbackThumbnail = "/img/placeholder.png";
 
   const handleSaveClick = async () => {
     try {
-      const res = await getSavedLists();
-      setLists(res.data.lists || []);
+      const res = await getCollections();
+      setCollections(res || []);
+      setSaveError(null);
       setShowModal(true);
     } catch (err) {
-      console.error('Failed to fetch lists:', err);
+      console.error("Failed to fetch collections:", err);
     }
   };
 
-  const handleAddToList = async (listName) => {
-    const updatedLists = lists.map((list) => {
-      if (list.name === listName) {
-        return {
-          ...list,
-          videos: [...list.videos, { title, thumbnail, videoId, length }],
-        };
-      }
-      return list;
-    });
-
-    setLists(updatedLists);
-    await updateSavedLists({ lists: updatedLists });
+  const handleModalClose = () => {
     setShowModal(false);
+    setShowNewCollectionPrompt(false);
+    setSaveError(null);
+    if (document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+  };
+
+  const handleAddToCollection = async (collectionId) => {
+    const videoData = {
+      title,
+      thumbnail,
+      videoId,
+      length,
+      channelTitle,
+      channelId,
+      viewCount: views,
+      publishedAt,
+    };
+    try {
+      setSaveError(null); // clear previous error
+      await addVideoToCollection(collectionId, videoData);
+      setShowModal(false);
+    } catch (err) {
+      console.error("Failed to add video to collection:", err);
+      const message =
+        err.response?.data?.error || "Failed to add video to collection.";
+      setSaveError(message); // display error inline
+    }
   };
 
   const handleCreateAndAdd = async () => {
-    if (!newListName.trim()) return;
-    const newList = {
-      name: newListName,
-      videos: [{ title, thumbnail, videoId, length }],
-    };
-    const updatedLists = [...lists, newList];
-    setLists(updatedLists);
-    await updateSavedLists({ lists: updatedLists });
-    setNewListName('');
-    setShowModal(false);
+    if (!newCollectionName.trim()) return;
+    try {
+      const created = await createCollection(newCollectionName);
+      setNewCollectionName("");
+      setShowNewCollectionPrompt(false);
+      const updatedCollections = await getCollections();
+      setCollections(updatedCollections);
+
+      if (created && created.collectionId) {
+        await handleAddToCollection(created.collectionId);
+      }
+    } catch (err) {
+      console.error("Failed to create collection:", err);
+    }
+  };
+
+  const handleGenerateTitle = () => {
+    navigate("/app/title-generator", { state: { initialIdea: title } });
   };
 
   return (
-  <div className="video-card">
-    <a
-      href={videoUrl}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="video-link"
-    >
-      <div className="thumbnail-wrapper">
-        <img
-          src={thumbnail && thumbnail.trim() !== '' ? thumbnail : fallbackThumbnail}
-          onError={(e) => {
-            e.currentTarget.onerror = null;
-            e.currentTarget.src = fallbackThumbnail;
-          }}
-          alt={title}
-          className="thumbnail-image"
-        />
-        <span className="video-length">{displayLength}</span>
-      </div>
+    <div className="video-card">
+      <a
+        href={videoUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="video-link"
+      >
+        <div className="thumbnail-wrapper">
+          <img
+            src={thumbnail?.trim() || fallbackThumbnail}
+            onError={(e) => {
+              e.currentTarget.onerror = null;
+              e.currentTarget.src = fallbackThumbnail;
+            }}
+            alt={title}
+            className="thumbnail-image"
+          />
+          <span className="video-length">{length}</span>
+        </div>
 
-      <div className="video-info">
-        <div className="video-title">
-          {typeof score === 'number' && score > 0 && (
-            <span
-              style={{
-                color:
-                  score >= 5 ? '#ff4d4d' :       // red
-                  score >= 3 ? '#ff9933' :        // orange
-                  score >= 1 ? '#ffe066' :        // yellow
-                  '#999999',                      // gray
-                marginRight: '0.3rem',
-                fontWeight: 'bold',
+        <div className="video-info">
+          <div className="video-title">
+            {typeof outlierScore === "number" && outlierScore > 0 && (
+              <span
+                style={{
+                  color:
+                    outlierScore >= 5
+                      ? "#ff4d4d"
+                      : outlierScore >= 3
+                        ? "#ff9933"
+                        : outlierScore >= 1
+                          ? "#ffe066"
+                          : "#999999",
+                  marginRight: "0.3rem",
+                  fontWeight: "bold",
+                }}
+              >
+                {outlierScore.toFixed(1)}x
+              </span>
+            )}
+            {title}
+          </div>
+          {views && publishedAt && (
+            <div className="video-meta">
+              {typeof views === "number" ? views.toLocaleString() : views} •{" "}
+              {timeAgoFromDate(publishedAt)}
+            </div>
+          )}
+          {showChannelTitle && channelTitle && (
+            <div
+              className="video-meta video-channel-link"
+              style={{ cursor: "pointer", textDecoration: "none" }}
+              onClick={(e) => {
+                e.preventDefault();
+                navigate(`/app/channel/${channelId}`);
               }}
             >
-              {score.toFixed(1)}x
-            </span>
+              {channelTitle}
+            </div>
           )}
-          {title}
         </div>
-        {views && timeAgo && !isPlaylist && (
-          <div className="video-meta">
-            {views} • {timeAgo}
-          </div>
-        )}
-      </div>
-    </a>
+      </a>
 
-      {showActions && !isPlaylist && (
-        <div className="video-actions">
-          <div className="ideate-block">
-            <div className="ideate-header">
-              <FaLightbulb className="icon" size={16} />
-              <span className="label">Ideate</span>
-            </div>
-            <div className="dropdown-menu">
-              <button>Generate Idea</button>
-              <button>Generate Thumbnail</button>
-              <button>Generate Title</button>
-              <button onClick={handleSaveClick}>Save</button>
-            </div>
+      <div className="video-actions">
+        <div className="ideate-block">
+          <div className="ideate-header">
+            <FaLightbulb className="icon" size={16} />
+            <span className="label">Ideate</span>
+          </div>
+          <div className="dropdown-menu">
+            <button onClick={handleGenerateTitle}>Generate Title</button>
+            <button onClick={handleSaveClick}>Save</button>
+            {onRemove && <button onClick={onRemove}>Remove</button>}
           </div>
         </div>
-      )}
+      </div>
 
       {showModal && (
-        <div className="modal-overlay">
-          <div className="modal">
-            <h3>Save Video</h3>
-
-            {/* List options */}
-            {lists.map((list) => (
+        <Modal
+          isOpen={showModal}
+          onClose={handleModalClose}
+          title="Save Video to Collection"
+          fields={[]}
+          formData={{}}
+          onChange={() => {}}
+          onSubmit={(e) => e.preventDefault()}
+          errors={{}}
+          loading={false}
+          submitLabel=""
+          actions={
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: "0.5rem",
+              }}
+            >
+              {collections.map((col) => (
+                <button
+                  key={col.collectionId}
+                  className="list-option-button"
+                  onClick={() => handleAddToCollection(col.collectionId)}
+                >
+                  {col.name}
+                </button>
+              ))}
               <button
-                key={list.name}
-                className="list-option-button"
-                onClick={() => handleAddToList(list.name)}
+                className="modal-action-button"
+                onClick={() => setShowNewCollectionPrompt(true)}
               >
-                {list.name}
+                ＋ Create New Collection
               </button>
-            ))}
-
-            {/* Create & Cancel buttons */}
-            <button className="modal-action-button" onClick={() => setShowNewListPrompt(true)}>
-              Create New List
-            </button>
-            <button className="modal-action-button" onClick={() => setShowModal(false)}>
-              Cancel
-            </button>
-          </div>
-        </div>
+            </div>
+          }
+        >
+          {saveError && (
+            <div
+              className="error-message"
+              style={{
+                marginTop: "0.5rem",
+                marginBottom: "0.5rem",
+                textAlign: "center",
+              }}
+            >
+              {saveError}
+            </div>
+          )}
+        </Modal>
       )}
 
-      {/* SECOND MODAL: Enter List Name */}
-      {showNewListPrompt && (
-        <div className="modal-overlay">
-          <div className="modal">
-            <h3>Enter List Name</h3>
-            <input
-              type="text"
-              placeholder="List name"
-              value={newListName}
-              onChange={(e) => setNewListName(e.target.value)}
-            />
-            <button className="modal-action-button" onClick={handleCreateAndAdd}>
-              Create
-            </button>
-            <button className="modal-action-button" onClick={() => setShowNewListPrompt(false)}>
-              Cancel
-            </button>
-          </div>
-        </div>
+      {showNewCollectionPrompt && (
+        <Modal
+          isOpen={showNewCollectionPrompt}
+          onClose={handleModalClose}
+          title="Enter Collection Name"
+          fields={[]}
+          formData={{}}
+          onChange={() => {}}
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleCreateAndAdd();
+          }}
+          errors={{}}
+          loading={false}
+          submitLabel="Create & Add"
+        >
+          <input
+            type="text"
+            placeholder="Collection name"
+            value={newCollectionName}
+            onChange={(e) => setNewCollectionName(e.target.value)}
+            className="form-input"
+          />
+        </Modal>
       )}
     </div>
   );

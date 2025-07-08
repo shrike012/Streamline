@@ -36,8 +36,8 @@ def signup():
     csrf_token = generate_csrf_token()
 
     resp = make_response(jsonify({"message": "User registered and logged in"}))
-    resp.set_cookie("token", encoded_token, httponly=True, secure=True, samesite="Lax", max_age=7200, path="/")
-    resp.set_cookie("csrf_token", csrf_token, httponly=False, secure=True, samesite="Lax", max_age=7200, path="/")
+    resp.set_cookie("token", encoded_token, httponly=True, secure=False, samesite="Lax", max_age=86400, path="/")
+    resp.set_cookie("csrf_token", csrf_token, httponly=False, secure=False, samesite="Lax", max_age=86400, path="/")
 
     current_app.logger.info(f"New user signed up: {email}")
     return resp
@@ -63,8 +63,8 @@ def login():
     csrf_token = generate_csrf_token()
 
     resp = make_response(jsonify({"message": "Login successful"}))
-    resp.set_cookie("token", encoded_token, httponly=True, secure=True, samesite="Lax", max_age=7200, path="/")
-    resp.set_cookie("csrf_token", csrf_token, httponly=False, secure=True, samesite="Lax", max_age=7200, path="/")
+    resp.set_cookie("token", encoded_token, httponly=True, secure=False, samesite="Lax", max_age=7200, path="/")
+    resp.set_cookie("csrf_token", csrf_token, httponly=False, secure=False, samesite="Lax", max_age=7200, path="/")
 
     current_app.logger.info(f"User logged in: {email}")
     return resp
@@ -110,23 +110,29 @@ def google_callback():
     if not user_info_res.ok:
         return jsonify({"error": "Failed to fetch user info"}), 400
 
-    userinfo = user_info_res.json()
-    email = userinfo["email"]
-    name = userinfo.get("name", "")
-    picture = userinfo.get("picture")
+    user_info = user_info_res.json()
+    email = user_info["email"]
+    sub = user_info.get("id")
 
     mongo = current_app.extensions["pymongo"]
     users = mongo.db.users
 
-    user = users.find_one({"email": email})
+    user = users.find_one({"google_id": sub})
+    if not user:
+        user = users.find_one({"email": email})
+
     if not user:
         users.insert_one({
             "email": email,
-            "name": name,
-            "auth_provider": "google",
-            "profile_picture": picture
+            "authProvider": "google",
+            "googleId": sub
         })
         user = users.find_one({"email": email})
+    else:
+        users.update_one(
+            {"_id": user["_id"]},
+            {"$set": {"email": email}}
+        )
 
     jwt_token = generate_token(email, user["_id"])
     if isinstance(jwt_token, bytes):
@@ -136,8 +142,8 @@ def google_callback():
     csrf_token = generate_csrf_token()
 
     resp = redirect(current_app.config.get("FRONTEND_REDIRECT_URI"))
-    resp.set_cookie("token", encoded_token, httponly=True, secure=True, samesite="Lax", max_age=7200, path="/")
-    resp.set_cookie("csrf_token", csrf_token, httponly=False, secure=True, samesite="Lax", max_age=7200, path="/")
+    resp.set_cookie("token", encoded_token, httponly=True, secure=False, samesite="Lax", max_age=7200, path="/")
+    resp.set_cookie("csrf_token", csrf_token, httponly=False, secure=False, samesite="Lax", max_age=7200, path="/")
 
     current_app.logger.info(f"User logged in via Google: {email}")
     return resp
@@ -152,8 +158,11 @@ def get_me(data):
     if not user:
         return jsonify({"error": "User not found"}), 404
 
-    user["_id"] = str(user["_id"])
-    return jsonify(user), 200
+    response_data = {
+        "_id": str(user["_id"]),
+        "email": user["email"],
+    }
+    return jsonify(response_data), 200
 
 @auth_bp.route("/forgot-password", methods=["POST"])
 def forgot_password():
@@ -192,7 +201,7 @@ def reset_password():
 
     try:
         serializer = URLSafeTimedSerializer(current_app.config["JWT_KEY"])
-        email = serializer.loads(token, salt="password-reset-salt", max_age=3600)  # 1 hour expiry
+        email = serializer.loads(token, salt="password-reset-salt", max_age=3600)
     except SignatureExpired:
         return jsonify({"error": "Reset token expired"}), 400
     except BadSignature:

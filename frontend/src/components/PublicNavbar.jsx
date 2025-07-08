@@ -1,21 +1,28 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import React, { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 import {
   getMe,
   login,
   signup,
   requestPasswordReset,
   resetPassword,
-} from '../api/apiRoutes.js';
-import Modal from './Modal.jsx';
-import { useAuth } from '../context/AuthContext.jsx';
-import '../styles/navbar.css';
+} from "../api/apiRoutes.js";
+import Modal from "./Modal.jsx";
+import { useAuth } from "../context/AuthContext.jsx";
+import "../styles/navbar.css";
 
 const Divider = () => (
-  <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', margin: '1.25rem 0' }}>
-    <span style={{ flex: 1, height: '1px', background: '#555' }} />
-    <span style={{ fontSize: '0.85rem', color: '#888' }}>OR</span>
-    <span style={{ flex: 1, height: '1px', background: '#555' }} />
+  <div
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: "0.75rem",
+      margin: "1.25rem 0",
+    }}
+  >
+    <span style={{ flex: 1, height: "1px", background: "#555" }} />
+    <span style={{ fontSize: "0.85rem", color: "#888" }}>OR</span>
+    <span style={{ flex: 1, height: "1px", background: "#555" }} />
   </div>
 );
 
@@ -23,47 +30,48 @@ const GoogleAuthButton = ({ onClick, disabled }) => (
   <button
     onClick={onClick}
     disabled={disabled}
-    style={{
-      width: '100%',
-      backgroundColor: 'white',
-      color: '#333',
-      border: '1px solid #ccc',
-      padding: '0.75rem 1.5rem',
-      borderRadius: '8px',
-      fontSize: '1rem',
-      fontWeight: 600,
-      cursor: 'pointer',
-      marginTop: 0,
-    }}
+    className={"button-secondary"}
+    style={{ width: "100%" }}
   >
     Continue with Google
   </button>
 );
 
 const PromptLink = ({ question, linkText, onClick }) => (
-  <p style={{ marginTop: '1.5rem', textAlign: 'left', fontSize: '0.95rem' }}>
-    {question} <span onClick={onClick} style={{ color: '#007bff', textDecoration: 'underline', cursor: 'pointer' }}>{linkText}</span>
+  <p style={{ marginTop: "1.5rem", textAlign: "left", fontSize: "0.95rem" }}>
+    {question}{" "}
+    <span
+      onClick={onClick}
+      style={{
+        color: "#007bff",
+        textDecoration: "underline",
+        cursor: "pointer",
+      }}
+    >
+      {linkText}
+    </span>
   </p>
 );
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 const REDIRECT_URI = import.meta.env.VITE_GOOGLE_REDIRECT_URI;
-const SCOPE = "https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile openid";
+const SCOPE =
+  "https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile openid";
 
 export default function PublicNavbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [showSignup, setShowSignup] = useState(false);
-  const [form, setForm] = useState({ email: '', password: '' });
+  const [form, setForm] = useState({ email: "", password: "" });
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [showForgotPassword, setShowForgotPassword] = useState(false);
-  const [forgotEmail, setForgotEmail] = useState('');
-  const [forgotMessage, setForgotMessage] = useState('');
-  const [resetToken, setResetToken] = useState('');
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotMessage, setForgotMessage] = useState("");
+  const [resetToken, setResetToken] = useState("");
   const [showResetModal, setShowResetModal] = useState(false);
-  const [newPassword, setNewPassword] = useState('');
-  const [resetMessage, setResetMessage] = useState('');
+  const [newPassword, setNewPassword] = useState("");
+  const [resetMessage, setResetMessage] = useState("");
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -75,9 +83,9 @@ export default function PublicNavbar() {
     const hasGoogleCode = params.get("code");
 
     getMe()
-      .then(res => {
+      .then((res) => {
         setUser(res.data);
-        navigate('/app/dashboard');
+        navigate("/app/dashboard");
       })
       .catch(() => {});
 
@@ -92,11 +100,18 @@ export default function PublicNavbar() {
     }
   }, [location, navigate, setUser]);
 
+  useEffect(() => {
+    const handleOpenSignup = () => setShowSignup(true);
+    window.addEventListener("open-signup", handleOpenSignup);
+
+    return () => window.removeEventListener("open-signup", handleOpenSignup);
+  }, []);
+
   const closeModals = () => {
     setShowLogin(false);
     setShowSignup(false);
     setErrors({});
-    setForm({ email: '', password: '' });
+    setForm({ email: "", password: "" });
   };
 
   const handleChange = (e) => {
@@ -105,7 +120,7 @@ export default function PublicNavbar() {
 
   const validate = () => {
     if (!form.email || !form.password) {
-      setErrors({ form: 'Invalid credentials.' });
+      setErrors({ form: "Invalid credentials." });
       return false;
     }
     return true;
@@ -114,11 +129,13 @@ export default function PublicNavbar() {
   const handleForgotPassword = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setForgotMessage('');
+    setForgotMessage("");
 
     try {
       await requestPasswordReset(forgotEmail);
-      setForgotMessage("If this email is registered, a reset link has been sent.");
+      setForgotMessage(
+        "If your account supports password login, a reset link has been sent to your email.",
+      );
     } catch {
       setForgotMessage("Something went wrong. Try again.");
     } finally {
@@ -129,7 +146,7 @@ export default function PublicNavbar() {
   const handleResetPassword = async (e) => {
     e.preventDefault();
     setLoading(true);
-    setResetMessage('');
+    setResetMessage("");
 
     try {
       await resetPassword({ token: resetToken, password: newPassword });
@@ -150,9 +167,9 @@ export default function PublicNavbar() {
       await login(form);
       const me = await getMe();
       setUser(me.data);
-      navigate('/app/dashboard');
+      navigate("/app/dashboard");
     } catch {
-      setErrors({ form: 'Invalid credentials.' });
+      setErrors({ form: "Invalid credentials." });
     } finally {
       setLoading(false);
     }
@@ -167,9 +184,9 @@ export default function PublicNavbar() {
       await signup(form);
       const me = await getMe();
       setUser(me.data);
-      navigate('/app/dashboard');
+      navigate("/app/dashboard");
     } catch {
-      setErrors({ form: 'Signup failed.' });
+      setErrors({ form: "Signup failed." });
     } finally {
       setLoading(false);
     }
@@ -190,21 +207,65 @@ export default function PublicNavbar() {
 
           <div className="navbar-section">
             <nav className="navbar-links">
-              <span className="nav-link" onClick={() => setShowLogin(true)}>Log in</span>
-              <button className="button-primary" onClick={() => setShowSignup(true)}>Create an account</button>
+              <span className="nav-link" onClick={() => setShowLogin(true)}>
+                Log in
+              </span>
+              <button
+                className="button-primary"
+                onClick={() => setShowSignup(true)}
+              >
+                Create an account
+              </button>
             </nav>
 
-            <button className="menu-toggle" onClick={() => setMenuOpen(!menuOpen)}>
-              {menuOpen ? '✕' : '☰'}
+            <button
+              className="menu-toggle"
+              onClick={() => setMenuOpen(!menuOpen)}
+            >
+              {menuOpen ? "✕" : "☰"}
             </button>
           </div>
         </div>
       </header>
 
       {menuOpen && (
-        <div className="mobile-menu">
-          <span className="nav-link" onClick={() => { setMenuOpen(false); setShowLogin(true); }}>Log in</span>
-          <button className="primary" onClick={() => { setMenuOpen(false); setShowSignup(true); }}>Create an account</button>
+        <div
+          className="mobile-menu-overlay"
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.85)",
+            backdropFilter: "blur(6px)",
+            WebkitBackdropFilter: "blur(6px)", // for Safari support
+            zIndex: 999,
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "center",
+            alignItems: "center",
+            gap: "1.5rem",
+          }}
+        >
+          <button
+            onClick={() => {
+              setMenuOpen(false);
+              setShowLogin(true);
+            }}
+            className={"button-secondary"}
+          >
+            Log in
+          </button>
+          <button
+            onClick={() => {
+              setMenuOpen(false);
+              setShowSignup(true);
+            }}
+            className={"button-primary"}
+          >
+            Create an account
+          </button>
         </div>
       )}
 
@@ -212,7 +273,10 @@ export default function PublicNavbar() {
         isOpen={showLogin}
         onClose={closeModals}
         title="Log In"
-        fields={[{ label: 'Email', name: 'email', type: 'email' }, { label: 'Password', name: 'password', type: 'password' }]}
+        fields={[
+          { label: "Email", name: "email", type: "email" },
+          { label: "Password", name: "password", type: "password" },
+        ]}
         formData={form}
         onChange={handleChange}
         onSubmit={handleLoginSubmit}
@@ -221,10 +285,27 @@ export default function PublicNavbar() {
         submitLabel="Log In"
         actions={
           <>
-            <PromptLink question="Forgot your password?" linkText="Reset it" onClick={() => { closeModals(); setShowForgotPassword(true); }} />
+            <PromptLink
+              question="Forgot your password?"
+              linkText="Reset it"
+              onClick={() => {
+                closeModals();
+                setShowForgotPassword(true);
+              }}
+            />
             <Divider />
-            <GoogleAuthButton onClick={handleGoogleRedirect} disabled={loading} />
-            <PromptLink question="Don’t have an account?" linkText="Sign up" onClick={() => { closeModals(); setShowSignup(true); }} />
+            <GoogleAuthButton
+              onClick={handleGoogleRedirect}
+              disabled={loading}
+            />
+            <PromptLink
+              question="Don’t have an account?"
+              linkText="Sign up"
+              onClick={() => {
+                closeModals();
+                setShowSignup(true);
+              }}
+            />
           </>
         }
       />
@@ -233,7 +314,10 @@ export default function PublicNavbar() {
         isOpen={showSignup}
         onClose={closeModals}
         title="Sign Up"
-        fields={[{ label: 'Email', name: 'email', type: 'email' }, { label: 'Password', name: 'password', type: 'password' }]}
+        fields={[
+          { label: "Email", name: "email", type: "email" },
+          { label: "Password", name: "password", type: "password" },
+        ]}
         formData={form}
         onChange={handleChange}
         onSubmit={handleSignupSubmit}
@@ -243,17 +327,31 @@ export default function PublicNavbar() {
         actions={
           <>
             <Divider />
-            <GoogleAuthButton onClick={handleGoogleRedirect} disabled={loading} />
-            <PromptLink question="Already have an account?" linkText="Log in" onClick={() => { closeModals(); setShowLogin(true); }} />
+            <GoogleAuthButton
+              onClick={handleGoogleRedirect}
+              disabled={loading}
+            />
+            <PromptLink
+              question="Already have an account?"
+              linkText="Log in"
+              onClick={() => {
+                closeModals();
+                setShowLogin(true);
+              }}
+            />
           </>
         }
       />
 
       <Modal
         isOpen={showForgotPassword}
-        onClose={() => { setShowForgotPassword(false); setForgotEmail(''); setForgotMessage(''); }}
+        onClose={() => {
+          setShowForgotPassword(false);
+          setForgotEmail("");
+          setForgotMessage("");
+        }}
         title="Reset Password"
-        fields={[{ label: 'Email', name: 'forgotEmail', type: 'email' }]}
+        fields={[{ label: "Email", name: "forgotEmail", type: "email" }]}
         formData={{ forgotEmail }}
         onChange={(e) => setForgotEmail(e.target.value)}
         onSubmit={handleForgotPassword}
@@ -264,9 +362,16 @@ export default function PublicNavbar() {
 
       <Modal
         isOpen={showResetModal}
-        onClose={() => { setShowResetModal(false); setResetToken(''); setNewPassword(''); setResetMessage(''); }}
+        onClose={() => {
+          setShowResetModal(false);
+          setResetToken("");
+          setNewPassword("");
+          setResetMessage("");
+        }}
         title="Set a New Password"
-        fields={[{ label: 'New Password', name: 'newPassword', type: 'password' }]}
+        fields={[
+          { label: "New Password", name: "newPassword", type: "password" },
+        ]}
         formData={{ newPassword }}
         onChange={(e) => setNewPassword(e.target.value)}
         onSubmit={handleResetPassword}

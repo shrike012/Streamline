@@ -1,180 +1,182 @@
 from flask import Blueprint, request, jsonify, current_app
+from utils.parser import chunkify
 from utils.security import auth_and_csrf_required
-from googleapiclient.discovery import build
-import statistics
+from utils.embeddings import embed_text, cosine_similarity
+import statistics, datetime, math, isodate
+from utils.youtube_api import get_youtube_client
 
 niche_explorer_bp = Blueprint("niche_explorer", __name__)
 
-def compute_channel_score(subs, total_views, num_videos_total, recent_views):
-    recent_avg_views = statistics.mean(recent_views) if recent_views else 0
-    num_videos_analyzed = len(recent_views)
-
-    views_per_video_total = total_views / (num_videos_total + 1)
-    views_per_sub = (recent_avg_views / subs) if subs > 0 else 0
-
-    raw_score = (
-        views_per_video_total * 2.0 +
-        views_per_sub * 3.0 +
-        recent_avg_views * 1.0
-    )
-
-    result = {
-        "subscriberCount": subs,
-        "total_views": total_views,
-        "num_videos_total": num_videos_total,
-        "recent_avg_views": round(recent_avg_views),
-        "num_videos_analyzed": num_videos_analyzed,
-        "raw_score": round(raw_score, 2),
-        "score": 0
-    }
-
-    return result, raw_score
+MAX_CHANNELS = 30
+ENGAGEMENT_THRESHOLD = 0.1
+RELEVANCE_THRESHOLD = 0.25
 
 @niche_explorer_bp.route("/search", methods=["POST"])
 @auth_and_csrf_required
 def niche_search(user_data):
     data = request.get_json()
     keyword = data.get("keyword", "").strip()
-    search_type = data.get("type", "channels")
+    time_frame = data.get("time_frame", "last_month")
+    video_type = data.get("video_type", "longform")
 
     if not keyword:
         return jsonify({"error": "Missing keyword"}), 400
 
-    yt = build("youtube", "v3", developerKey=current_app.config["GOOGLE_YT_API_KEY"])
+    timeframes = {
+        "last_week": 7,
+        "last_month": 30,
+        "last_year": 365,
+        "last_2_years": 730,
+    }
 
-    if search_type == "channels":
-        video_search = yt.search().list(
+    if time_frame not in timeframes:
+        return jsonify({"error": "Invalid time_frame"}), 400
+
+    now = datetime.datetime.now(datetime.timezone.utc).replace(microsecond=0)
+    published_after = (
+        now - datetime.timedelta(days=timeframes[time_frame])
+    ).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    yt = get_youtube_client()
+
+    # Initial video search
+    if video_type == "shorts":
+        search = yt.search().list(
             part="snippet",
             q=keyword,
             type="video",
-            maxResults=100
+            order="viewCount",
+            publishedAfter=published_after,
+            videoDuration="short",
+            maxResults=50
         ).execute()
-
-        video_items = video_search.get("items", [])
-        channel_view_map = {}
-
-        video_ids = [vid["id"]["videoId"] for vid in video_items if "videoId" in vid["id"]]
-
-        for chunk_start in range(0, len(video_ids), 50):
-            chunk_ids = video_ids[chunk_start:chunk_start + 50]
-            video_details = yt.videos().list(
-                part="snippet,statistics",
-                id=",".join(chunk_ids)
-            ).execute()
-
-            for vid in video_details.get("items", []):
-                ch_id = vid["snippet"]["channelId"]
-                views = int(vid.get("statistics", {}).get("viewCount", 0))
-                if ch_id not in channel_view_map:
-                    channel_view_map[ch_id] = {"views": [], "video_count": 0}
-                channel_view_map[ch_id]["views"].append(views)
-                channel_view_map[ch_id]["video_count"] += 1
-
-        top_channels = sorted(channel_view_map.items(), key=lambda x: x[1]["video_count"], reverse=True)[:20]
-        channel_ids = [ch[0] for ch in top_channels]
-
-        chan_info = yt.channels().list(
-            part="snippet,statistics,contentDetails",
-            id=",".join(channel_ids)
+        video_items = search.get("items", [])
+    elif video_type == "longform":
+        medium = yt.search().list(
+            part="snippet",
+            q=keyword,
+            type="video",
+            order="viewCount",
+            publishedAfter=published_after,
+            videoDuration="medium",
+            maxResults=50
         ).execute()
-
-        results = []
-        scores = []
-
-        for ch in chan_info.get("items", []):
-            try:
-                ch_id = ch["id"]
-                title = ch["snippet"]["title"]
-                avatar = ch["snippet"]["thumbnails"]["default"]["url"]
-                subs = int(ch["statistics"].get("subscriberCount", 0))
-                total_views = int(ch["statistics"].get("viewCount", 0))
-                num_videos_total = int(ch["statistics"].get("videoCount", 0))
-
-                # Filter 1 — skip corporate / mass channels
-                if num_videos_total > 1000:
-                    continue
-
-                uploads_playlist = ch["contentDetails"]["relatedPlaylists"]["uploads"]
-
-                uploads_resp = yt.playlistItems().list(
-                    part="contentDetails",
-                    playlistId=uploads_playlist,
-                    maxResults=20
-                ).execute()
-
-                upload_video_ids = [item["contentDetails"]["videoId"] for item in uploads_resp.get("items", [])]
-
-                vid_details = yt.videos().list(
-                    part="statistics",
-                    id=",".join(upload_video_ids)
-                ).execute()
-
-                recent_views = [
-                    int(vid.get("statistics", {}).get("viewCount", 0))
-                    for vid in vid_details.get("items", [])
-                ]
-
-                score_obj, raw_score = compute_channel_score(
-                    subs=subs,
-                    total_views=total_views,
-                    num_videos_total=num_videos_total,
-                    recent_views=recent_views
-                )
-
-                score_obj.update({
-                    "channelId": ch_id,
-                    "title": title,
-                    "avatar": avatar.replace("http://", "https://"),
-                    "url": f"https://www.youtube.com/channel/{ch_id}",
-                    "subscriberCount": subs
-                })
-
-                # Filter 2 — skip dead channels (recent_avg_views < 5% of subs)
-                if subs == 0 or score_obj["recent_avg_views"] < (0.05 * subs):
-                    continue
-
-                results.append(score_obj)
-                scores.append(raw_score)
-
-            except Exception as e:
-                current_app.logger.error(f"Error processing channel {ch['id']}: {e}")
-
-        if scores:
-            min_score = min(scores)
-            max_score = max(scores)
-            score_range = max(max_score - min_score, 1e-6)
-
-            for obj, raw in zip(results, scores):
-                norm_score = (raw - min_score) / score_range
-                obj["score"] = round(norm_score * 100, 1)
-
-        current_app.logger.info(
-            f"User {user_data['email']} ran niche search '{keyword}' and fetched {len(results)} channels."
-        )
-        return jsonify(results), 200
-
+        long = yt.search().list(
+            part="snippet",
+            q=keyword,
+            type="video",
+            order="viewCount",
+            publishedAfter=published_after,
+            videoDuration="long",
+            maxResults=50
+        ).execute()
+        video_items = medium.get("items", []) + long.get("items", [])
     else:
-        video_search = yt.search().list(
-            part="snippet",
-            q=keyword,
-            type="video",
-            maxResults=25
-        ).execute()
+        return jsonify({"error": "Invalid video_type"}), 400
 
-        video_items = video_search.get("items", [])
-        video_results = [
-            {
-                "videoId": vid["id"]["videoId"],
-                "title": vid["snippet"]["title"],
-                "thumbnail": vid["snippet"]["thumbnails"]["high"]["url"].replace("http://", "https://"),
-                "channelTitle": vid["snippet"]["channelTitle"],
-                "publishedAt": vid["snippet"]["publishedAt"]
+    query_vector = embed_text(keyword)
+
+    # Determine relevant videos initially
+    video_info = []
+    for vid in video_items:
+        snippet = vid.get("snippet", {})
+        combined = f"{snippet.get('title', 'N/A')} {snippet.get('channelTitle', 'N/A')}"
+        video_info.append((vid, combined))
+
+    combined_vectors = embed_text([combined for _, combined in video_info])
+
+    relevant_videos = []
+    for idx, (vid, _) in enumerate(video_info):
+        sim = cosine_similarity(query_vector, combined_vectors[idx])
+        if sim >= RELEVANCE_THRESHOLD:
+            relevant_videos.append(vid)
+
+    channel_ids = list({vid["snippet"]["channelId"] for vid in relevant_videos if "videoId" in vid["id"]})
+    channel_ids = channel_ids[:MAX_CHANNELS]
+
+    # Fetch channels & recent uploads
+    channel_map = {}
+    for chunk in chunkify(channel_ids, 20):
+        details = yt.channels().list(part="snippet,statistics,contentDetails", id=",".join(chunk)).execute()
+        for chan in details.get("items", []):
+            ch_id = chan["id"]
+            uploads_id = chan["contentDetails"]["relatedPlaylists"]["uploads"]
+            channel_map[ch_id] = {
+                "channelId": ch_id,
+                "channelTitle": chan["snippet"]["title"],
+                "avatar": chan["snippet"]["thumbnails"]["default"]["url"].replace("http://", "https://"),
+                "subscriberCount": int(chan.get("statistics", {}).get("subscriberCount", 0)),
+                "recentTitles": [],
+                "recentViews": [],
+                "description": chan["snippet"].get("description", "")
             }
-            for vid in video_items
-            if "videoId" in vid["id"]
-        ]
 
-        current_app.logger.info(
-            f"User {user_data['email']} ran video search '{keyword}' and fetched {len(video_results)} videos."
-        )
-        return jsonify(video_results), 200
+            playlist_items = yt.playlistItems().list(
+                part="snippet,contentDetails",
+                playlistId=uploads_id,
+                maxResults=10
+            ).execute()
+            video_ids = [item["contentDetails"]["videoId"] for item in playlist_items.get("items", [])]
+
+            for vchunk in chunkify(video_ids, 50):
+                vids = yt.videos().list(part="snippet,statistics,contentDetails", id=",".join(vchunk)).execute()
+                for vid in vids.get("items", []):
+                    snippet = vid["snippet"]
+                    title = snippet["title"]
+                    views = int(vid.get("statistics", {}).get("viewCount", 0))
+                    dur = isodate.parse_duration(vid.get("contentDetails", {}).get("duration", "PT0S")).total_seconds()
+
+                    if not ((video_type == "shorts" and dur > 120) or (video_type == "longform" and dur <= 120)):
+                        channel_map[ch_id]["recentViews"].append(views)
+
+                    channel_map[ch_id]["recentTitles"].append(title)
+
+    # Engagement filter
+    filtered = {}
+    for ch_id, ch in channel_map.items():
+        subs = ch["subscriberCount"]
+        top_views = max(ch["recentViews"], default=0)
+        engagement = top_views / (subs + 1)
+        if engagement >= ENGAGEMENT_THRESHOLD:
+            filtered[ch_id] = ch
+
+    # Embed combined text & determine relevance
+    combined_texts, combined_ch_keys = [], []
+    for ch_id, ch in filtered.items():
+        combined_titles = " ".join(ch["recentTitles"])
+        desc = ch.get("description", "").replace("\n", " ")[:500]
+        combined_text = f"{combined_titles} {ch['channelTitle']} {desc}"
+        combined_texts.append(combined_text)
+        combined_ch_keys.append(ch_id)
+
+    final_channel_map = {}
+    if combined_texts:
+        combined_vectors = embed_text(combined_texts)
+        for idx, ch_id in enumerate(combined_ch_keys):
+            sim = cosine_similarity(query_vector, combined_vectors[idx])
+            if sim >= RELEVANCE_THRESHOLD:
+                final_channel_map[ch_id] = filtered[ch_id]
+
+    # Score & sort
+    results = []
+    for ch in final_channel_map.values():
+        subs = ch["subscriberCount"]
+        top_views = max(ch["recentViews"], default=0)
+        median_views = statistics.median(ch["recentViews"]) if ch["recentViews"] else 0
+        upload_activity = len(ch["recentViews"])
+
+        median_vs_subs = median_views / (subs + 1)
+        peak_vs_subs = top_views / (subs + 1)
+        peak_vs_median = top_views / (median_views + 1)
+
+        raw_score = (median_vs_subs * 6.0) + (peak_vs_subs * 3.0) + (peak_vs_median * 1.0) + math.log10(upload_activity + 1) * 2.0
+
+        ch.update({"score": round(raw_score, 2)})
+        results.append(ch)
+
+    results.sort(key=lambda x: x["score"], reverse=True)
+
+    current_app.logger.info(
+        f"User {user_data['email']} ran niche search '{keyword}' time_frame={time_frame} type={video_type} and fetched {len(results)} channels."
+    )
+    return jsonify(results), 200

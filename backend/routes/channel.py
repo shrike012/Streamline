@@ -1,175 +1,112 @@
+from utils.channel import compute_outlier_scores, analyze_channel_insights
 from flask import Blueprint, request, jsonify, current_app
-from googleapiclient.discovery import build
-from utils.security import token_required, auth_and_csrf_required
-from datetime import datetime, timezone
-from dateutil import parser as date_parser
+from utils.embeddings import embed_text, cosine_similarity
+from utils.parser import parse_channel_metadata, extract_main_topic, parse_motives
+from utils.security import auth_and_csrf_required
+from datetime import datetime, timezone, timedelta
 from bson import ObjectId
-import humanize
-import isodate
-import statistics
+from utils.youtube_api import get_youtube_client, fetch_channel_videos
+from statistics import median
+from utils.db import get_cached_document, update_cache_document
+from dateutil import parser as date_parser
+from utils.scheduled_jobs import find_outliers_for_channel
 
 channel_bp = Blueprint("channel", __name__)
 
-def compute_outlier_scores(videos):
-    scores = []
-    view_counts = [v["viewCount"] for v in videos]
-
-    for i, vc in enumerate(view_counts):
-        if vc == 0:
-            scores.append(0.0)
-            continue
-
-        neighbors = []
-        for offset in range(1, 6):
-            if i - offset >= 0 and view_counts[i - offset] > 0:
-                neighbors.append(view_counts[i - offset])
-            if i + offset < len(view_counts) and view_counts[i + offset] > 0:
-                neighbors.append(view_counts[i + offset])
-
-        if not neighbors:
-            scores.append(1.0)
-            continue
-
-        median_views = statistics.median(neighbors)
-        score = vc / median_views if median_views > 0 else 1.0
-        scores.append(round(score, 1))
-
-    return scores
-
-
-@channel_bp.route("/videos", methods=["POST"])
+@channel_bp.route("/<channel_id>/stats", methods=["GET"])
 @auth_and_csrf_required
-def get_channel_videos(data):
-    body = request.get_json()
-    channel_id = body.get("channelId")
-
+def get_channel_stats(data, channel_id):
     if not channel_id or not channel_id.startswith("UC"):
         return jsonify({"error": "Invalid channelId"}), 400
 
     try:
-        yt = build("youtube", "v3", developerKey=current_app.config["GOOGLE_YT_API_KEY"])
+        mongo = current_app.extensions["pymongo"]
+        now = datetime.now(timezone.utc)
 
-        chan_info = yt.channels().list(
-            part="snippet,statistics,contentDetails",
-            id=channel_id
-        ).execute()
+        # Serve from cache if available
+        cached = get_cached_document(
+            mongo=mongo,
+            collection_name="channel_stats",
+            query={"channelId": channel_id},
+            ttl_minutes=60
+        )
+        if cached:
+            cached.pop("_id", None)
+            return jsonify(cached["stats"])
 
-        if not chan_info["items"]:
+        yt = get_youtube_client()
+
+        # Get channel metadata and uploads playlist
+        chan_info = yt.channels().list(part="statistics,contentDetails,snippet", id=channel_id).execute()
+        chan_items = chan_info.get("items", [])
+        if not chan_items:
             return jsonify({"error": "Channel not found"}), 404
 
-        item = chan_info["items"][0]
-        snippet = item["snippet"]
-        stats = item.get("statistics", {})
-        uploads_id = item["contentDetails"]["relatedPlaylists"]["uploads"]
+        stats = chan_items[0].get("statistics", {})
+        total_subs = int(stats.get("subscriberCount", 0)) if stats.get("subscriberCount") else 0
+        uploads_id = chan_items[0]["contentDetails"]["relatedPlaylists"]["uploads"]
 
-        channel_title = snippet["title"]
-        avatar = snippet["thumbnails"]["default"]["url"]
-        subs = int(stats.get("subscriberCount", 0))
-        total_views = int(stats.get("viewCount", 0))
-        num_videos_total = int(stats.get("videoCount", 0))
+        # Fetch up to 50 recent videos using helper
+        videos_res = fetch_channel_videos(yt, uploads_id, max_videos=50)
+        videos = videos_res["videos"]
 
-        video_ids = []
-        next_page_token = None
-        while len(video_ids) < 500:
-            resp = yt.playlistItems().list(
-                part="contentDetails,snippet",
-                playlistId=uploads_id,
-                maxResults=50,
-                pageToken=next_page_token
-            ).execute()
-
-            for item in resp.get("items", []):
-                video_ids.append(item["contentDetails"]["videoId"])
-
-            next_page_token = resp.get("nextPageToken")
-            if not next_page_token:
-                break
-
-        def chunkify(lst, size):
-            for i in range(0, len(lst), size):
-                yield lst[i:i + size]
-
-        videos = []
-        for chunk in chunkify(video_ids, 50):
-            details = yt.videos().list(
-                part="snippet,contentDetails,statistics",
-                id=",".join(chunk)
-            ).execute()
-
-            for item in details.get("items", []):
-                snippet = item["snippet"]
-                stats = item.get("statistics", {})
-                content = item.get("contentDetails", {})
-
-                published = date_parser.parse(snippet["publishedAt"])
-                time_ago = humanize.naturaltime(datetime.now(timezone.utc) - published)
-
-                duration = isodate.parse_duration(content.get("duration", "PT0S"))
-                total_seconds = int(duration.total_seconds())
-                mins, secs = divmod(total_seconds, 60)
-                hrs, mins = divmod(mins, 60)
-                length = f"{hrs}:{mins:02}:{secs:02}" if hrs > 0 else f"{mins}:{secs:02}"
-
-                videos.append({
-                    "videoId": item["id"],
-                    "title": snippet["title"],
-                    "thumbnail": snippet["thumbnails"]["high"]["url"],
-                    "publishedAt": snippet["publishedAt"],
-                    "timeAgo": time_ago,
-                    "viewCount": int(stats.get("viewCount", 0)),
-                    "length": length
-                })
-
-        outlier_scores = compute_outlier_scores(videos)
-        for idx, score in enumerate(outlier_scores):
-            videos[idx]["outlierScore"] = score
-
-        current_app.logger.info(
-            f"User {data['email']} fetched videos for channel {channel_id} ({channel_title})"
+        # Uploads in last 30 days
+        last_30_days = now - timedelta(days=30)
+        uploads_last_30d = sum(
+            1 for video in videos
+            if date_parser.parse(video["publishedAt"]).replace(tzinfo=timezone.utc) >= last_30_days
         )
 
-        return jsonify({
-            "channel": {
-                "channelId": channel_id,
-                "title": channel_title,
-                "avatar": avatar.replace("http://", "https://"),
-                "subscriberCount": subs,
-                "total_views": total_views,
-                "num_videos_total": num_videos_total
-            },
-            "videos": videos
-        })
+        # Compute median views and outlier scores for last 10 uploads
+        recent_10 = videos[:10]
+        median_views = 0
+        num_recent_outliers = 0
+        recent_videos = []
+
+        if recent_10:
+            views_list = [v["viewCount"] for v in recent_10]
+            median_views = int(round(median(views_list))) if views_list else 0
+
+            outlier_scores = compute_outlier_scores(recent_10)
+            for i, score in enumerate(outlier_scores):
+                recent_10[i]["score"] = score
+
+            num_recent_outliers = sum(1 for s in outlier_scores if s >= 2.0)
+
+            for video in recent_10[:4]:
+                recent_videos.append({
+                    "videoId": video["videoId"],
+                    "title": video["title"],
+                    "thumbnail": video["thumbnail"],
+                    "viewCount": video["viewCount"],
+                    "publishedAt": video["publishedAt"],
+                    "outlierScore": video["score"],
+                    "channelId": video["channelId"],
+                    "channelTitle": video["channelTitle"],
+                    "length": video["length"],
+                })
+
+        # Final response
+        stats_response = {
+            "uploadsLast30d": uploads_last_30d,
+            "medianViewsRecent10": median_views,
+            "totalSubscribers": total_subs,
+            "numRecentOutliers": num_recent_outliers,
+            "recentVideos": recent_videos,
+        }
+
+        # Cache and return
+        update_cache_document(
+            mongo=mongo,
+            collection_name="channel_stats",
+            query={"channelId": channel_id},
+            new_data={"stats": stats_response, "fetchedAt": now}
+        )
+
+        return jsonify(stats_response)
 
     except Exception as e:
-        current_app.logger.error(f"Failed to fetch videos for user {data['email']}: {str(e)}")
-        return jsonify({"error": f"Failed to fetch videos: {str(e)}"}), 500
-
-
-@channel_bp.route("/list", methods=["GET"])
-@token_required
-def list_user_channels(data):
-    try:
-        mongo = current_app.extensions["pymongo"]
-        users = mongo.db.users
-        user_id = ObjectId(data["user_id"])
-        result = users.find_one({"_id": user_id})
-        raw_channels = result.get("channels", [])
-
-        channels = []
-        for ch in raw_channels:
-            channels.append({
-                "channelId": ch.get("channelId"),
-                "title": ch.get("title"),
-                "avatar": ch.get("avatar"),
-                "handle": ch.get("handle"),
-                "category": ch.get("category", ""),
-                "format": ch.get("format", "")
-            })
-
-        return jsonify({"channels": channels})
-
-    except Exception as e:
-        current_app.logger.error(f"Failed to list channels for user {data['email']}: {str(e)}")
+        current_app.logger.error(f"Failed to fetch stats for user {data['email']} channelId={channel_id}: {str(e)}")
         return jsonify({"error": "Internal server error"}), 500
 
 @channel_bp.route("/search", methods=["GET"])
@@ -180,7 +117,7 @@ def search_channels(data):
         return jsonify({"error": "Missing search query"}), 400
 
     try:
-        yt = build("youtube", "v3", developerKey=current_app.config["GOOGLE_YT_API_KEY"])
+        yt = get_youtube_client()
 
         res = yt.search().list(
             q=query,
@@ -189,7 +126,7 @@ def search_channels(data):
             maxResults=25
         ).execute()
 
-        channel_ids = [item["snippet"]["channelId"] for item in res.get("items", [])]
+        channel_ids = [item["id"]["channelId"] for item in res.get("items", [])]
 
         chan_info = yt.channels().list(
             part="snippet,statistics",
@@ -204,17 +141,122 @@ def search_channels(data):
 
             results.append({
                 "channelId": item["id"],
-                "title": snippet["title"],
+                "channelTitle": snippet["title"],
                 "description": snippet.get("description", ""),
                 "avatar": snippet["thumbnails"]["default"]["url"].replace("http://", "https://"),
-                "subscriberCount": sub_count
+                "subscriberCount": sub_count or "hidden"
             })
+
+        results.sort(
+            key=lambda ch: ch["subscriberCount"] if isinstance(ch["subscriberCount"], int) else 0,
+            reverse=True
+        )
 
         return jsonify({"results": results})
 
     except Exception as e:
         current_app.logger.error(f"Channel search failed for query '{query}': {str(e)}")
         return jsonify({"error": "Failed to search channels"}), 500
+
+@channel_bp.route("/list", methods=["GET"])
+@auth_and_csrf_required
+def list_user_channels(data):
+    try:
+        mongo = current_app.extensions["pymongo"]
+        users = mongo.db.users
+        user_id = ObjectId(data["user_id"])
+
+        result = users.find_one({"_id": user_id})
+
+        if not result:
+            return jsonify({"channels": []})
+
+        raw_channels = result.get("channels", [])
+
+        channels = []
+        for ch in raw_channels:
+            channels.append({
+                "channelId": ch.get("channelId"),
+                "channelTitle": ch.get("channelTitle"),
+                "avatar": ch.get("avatar"),
+                "handle": ch.get("handle"),
+                "analyzedNiche": ch.get("analyzedNiche", ""),
+                "analyzedStyle": ch.get("analyzedStyle", ""),
+                "analyzedAttentionMarket": ch.get("analyzedAttentionMarket", ""),
+            })
+
+        return jsonify({"channels": channels})
+
+    except Exception as e:
+        current_app.logger.error(f"Failed to list channels for user {data['email']}: {str(e)}")
+        return jsonify({"error": "Internal server error"}), 500
+
+@channel_bp.route("/add", methods=["POST"])
+@auth_and_csrf_required
+def add_channel(data):
+    body = request.get_json()
+    channel_id = body.get("channelId")
+
+    if not channel_id or not channel_id.startswith("UC"):
+        return jsonify({"error": "Missing or invalid channelId"}), 400
+
+    try:
+        user_id = ObjectId(data["user_id"])
+        user_email = data["email"]
+        mongo = current_app.extensions["pymongo"]
+        users = mongo.db.users
+
+        existing = users.find_one({"_id": user_id, "channels.channelId": channel_id})
+        if existing:
+            return jsonify({"error": "Channel already added"}), 400
+
+        yt = get_youtube_client()
+        chan_info = yt.channels().list(
+            part="snippet,statistics,contentDetails",
+            id=channel_id
+        ).execute()
+
+        if not chan_info["items"]:
+            return jsonify({"error": "Channel metadata not found"}), 404
+
+        meta = parse_channel_metadata(chan_info)
+        uploads_id = meta["uploadsId"]
+
+        videos_res = fetch_channel_videos(yt, uploads_id, 20)
+        videos = videos_res.get("videos", [])
+
+        insights = analyze_channel_insights(meta["description"], videos)
+
+        if not insights or insights.get("format") == "Unknown":
+            return jsonify({"error": "Could not analyze channel — no videos or unknown format"}), 400
+
+        handle = chan_info["items"][0]["snippet"].get("customUrl") or f"channel/{channel_id}"
+
+        user_channel = {
+            "handle": handle,
+            "channelId": meta["channelId"],
+            "channelTitle": meta["channelTitle"],
+            "avatar": meta["avatar"],
+            "analyzedNiche": insights["analyzedNiche"],
+            "analyzedStyle": insights["analyzedStyle"],
+            "analyzedAttentionMarket": insights["analyzedAttentionMarket"]
+        }
+
+        users.update_one(
+            {"_id": user_id},
+            {"$addToSet": {"channels": user_channel}}
+        )
+
+        try:
+            find_outliers_for_channel(user_id, user_email, user_channel)
+        except Exception as e:
+            current_app.logger.error(f"[{user_email}] Error computing outliers after adding channel {channel_id}: {e}")
+
+        return jsonify(user_channel)
+
+    except Exception as e:
+        current_app.logger.error(f"Failed to add channel for user {data['email']}: {str(e)}")
+        return jsonify({"error": f"Failed to add channel: {str(e)}"}), 500
 
 @channel_bp.route("/remove", methods=["POST"])
 @auth_and_csrf_required
@@ -236,74 +278,319 @@ def remove_channel(data):
         )
 
         if result.modified_count == 0:
-            current_app.logger.warning(f"User {data['email']} attempted to remove nonexistent or already-removed channel {channel_id}")
             return jsonify({"error": "Channel not found or not removed"}), 404
 
-        current_app.logger.info(f"User {data['email']} removed channel {channel_id}")
         return jsonify({"message": "Channel removed successfully"}), 200
 
     except Exception as e:
         current_app.logger.error(f"Error while removing channel for user {data['email']}: {str(e)}")
         return jsonify({"error": "Internal server error"}), 500
 
-@channel_bp.route("/add", methods=["POST"])
+@channel_bp.route("/<channel_id>/metadata", methods=["GET"])
 @auth_and_csrf_required
-def add_channel(data):
-    body = request.get_json()
-    channel_id = body.get("channelId")
-    category = body.get("category", "").strip()
-    format_ = body.get("format", "").strip()
-
-    if not channel_id:
-        return jsonify({"error": "Missing channelId"}), 400
-    if not category or not format_:
-        return jsonify({"error": "Missing category or format"}), 400
+def get_channel_metadata(data, channel_id):
+    if not channel_id or not channel_id.startswith("UC"):
+        return jsonify({"error": "Invalid channelId"}), 400
 
     try:
-        yt = build("youtube", "v3", developerKey=current_app.config["GOOGLE_YT_API_KEY"])
-        chan_info = yt.channels().list(part="snippet", id=channel_id).execute()
+        mongo = current_app.extensions["pymongo"]
+
+        # Try to serve from cache
+        cached = get_cached_document(
+            mongo=mongo,
+            collection_name="channel_metadata",
+            query={"channelId": channel_id},
+            ttl_minutes=1440
+        )
+        if cached:
+            cached.pop("_id", None)
+            return jsonify({"channel": cached})
+
+        yt = get_youtube_client()
+        chan_info = yt.channels().list(
+            part="snippet,statistics,contentDetails",
+            id=channel_id
+        ).execute()
 
         if not chan_info["items"]:
-            return jsonify({"error": "Channel metadata not found"}), 404
+            return jsonify({"error": "Channel not found"}), 404
 
-        snippet = chan_info["items"][0]["snippet"]
-        title = snippet["title"]
-        avatar = snippet["thumbnails"]["default"]["url"]
-        handle = snippet.get("customUrl") or f"channel/{channel_id}"
+        meta = parse_channel_metadata(chan_info)
 
-        user_id = ObjectId(data["user_id"])
-        mongo = current_app.extensions["pymongo"]
-        users = mongo.db.users
-
-        existing = users.find_one({"_id": user_id, "channels.channelId": channel_id})
-        if existing:
-            current_app.logger.warning(f"User {data['email']} attempted to re-add channel {channel_id}")
-            return jsonify({"error": "Channel already added"}), 400
-
-        users.update_one(
-            {"_id": user_id},
-            {"$addToSet": {"channels": {
-                "handle": handle,
-                "channelId": channel_id,
-                "title": title,
-                "avatar": avatar,
-                "category": category,
-                "format": format_
-            }}}
+        # Save fresh metadata to cache
+        update_cache_document(
+            mongo=mongo,
+            collection_name="channel_metadata",
+            query={"channelId": meta["channelId"]},
+            new_data=meta
         )
 
-        current_app.logger.info(
-            f"User {data['email']} added channel {channel_id} ({title}) category={category} format={format_}"
+        return jsonify({"channel": meta})
+
+    except Exception as e:
+        current_app.logger.error(f"Failed to fetch metadata for user {data['email']} channelId={channel_id}: {str(e)}")
+        return jsonify({"error": "Failed to fetch metadata"}), 500
+
+@channel_bp.route("/<channel_id>/videos", methods=["POST"])
+@auth_and_csrf_required
+def get_channel_videos(data, channel_id):
+    body = request.get_json()
+    content_type = (body.get("contentType") or "longform").lower()
+    page_token = body.get("pageToken")
+
+    if not channel_id or not channel_id.startswith("UC"):
+        return jsonify({"error": "Invalid channelId"}), 400
+
+    try:
+        mongo = current_app.extensions["pymongo"]
+
+        if not page_token:
+            cached = get_cached_document(
+                mongo=mongo,
+                collection_name="channel_videos",
+                query={"channelId": channel_id, "contentType": content_type},
+                ttl_minutes=10
+            )
+            if cached:
+                cached.pop("_id", None)
+
+                # Return max 50 videos from cache
+                cached_videos = cached.get("videos", [])[:50]
+
+                return jsonify({
+                    "videos": cached_videos,
+                    "nextPageToken": cached.get("nextPageToken")
+                })
+
+        yt = get_youtube_client()
+
+        chan_info = yt.channels().list(
+            part="snippet,statistics,contentDetails",
+            id=channel_id
+        ).execute()
+
+        if not chan_info["items"]:
+            return jsonify({"error": "Channel not found"}), 404
+
+        meta = parse_channel_metadata(chan_info)
+        uploads_id = meta["uploadsId"]
+
+        MAX_SCAN_PAGES = 5
+        TARGET_COUNT = 10
+        page_count = 0
+        filtered_videos = []
+        next_token = page_token
+
+        while page_count < MAX_SCAN_PAGES:
+            videos_res = fetch_channel_videos(yt, uploads_id, 30, next_token)
+            raw_videos = videos_res.get("videos", [])
+            next_token = videos_res.get("nextPageToken")
+
+            # Filter videos by content type
+            for v in raw_videos:
+                is_shorts = (
+                    v["totalSeconds"] <= 60 or
+                    "#shorts" in v.get("title", "").lower() or
+                    "#shorts" in v.get("description", "").lower()
+                )
+                if content_type == "shorts" and not is_shorts:
+                    continue
+                if content_type == "longform" and is_shorts:
+                    continue
+                filtered_videos.append(v)
+
+            if len(filtered_videos) >= TARGET_COUNT or not next_token:
+                break
+
+            page_count += 1
+
+        outlier_scores = compute_outlier_scores(filtered_videos)
+        for idx, video in enumerate(filtered_videos):
+            video["outlierScore"] = outlier_scores[idx]
+
+        # Fetch existing cached videos if any
+        cached_doc = get_cached_document(
+            mongo=mongo,
+            collection_name="channel_videos",
+            query={"channelId": channel_id, "contentType": content_type},
+            ttl_minutes=10
+        )
+        existing_videos = cached_doc.get("videos", []) if cached_doc else []
+
+        # Add new unique videos to existing ones
+        existing_video_ids = {v["videoId"] for v in existing_videos}
+        for new_vid in filtered_videos:
+            if new_vid["videoId"] not in existing_video_ids:
+                existing_videos.append(new_vid)
+
+        # Cap stored videos to max 50 to prevent bloat
+        MAX_STORED_VIDEOS = 50
+        existing_videos = existing_videos[:MAX_STORED_VIDEOS]
+
+        update_cache_document(
+            mongo=mongo,
+            collection_name="channel_videos",
+            query={"channelId": channel_id, "contentType": content_type},
+            new_data={
+                "videos": existing_videos,
+                "nextPageToken": next_token
+            }
         )
 
         return jsonify({
-            "channelId": channel_id,
-            "title": title,
-            "avatar": avatar,
-            "category": category,
-            "format": format_
+            "videos": filtered_videos,
+            "nextPageToken": next_token
         })
 
     except Exception as e:
-        current_app.logger.error(f"Failed to add channel for user {data['email']}: {str(e)}")
-        return jsonify({"error": f"Failed to add channel: {str(e)}"}), 500
+        return jsonify({"error": "Failed to fetch videos"}), 500
+
+@channel_bp.route("/<channel_id>/insights", methods=["POST"])
+@auth_and_csrf_required
+def get_channel_insights(data, channel_id):
+    body = request.get_json()
+    my_channel_id = body.get("my_channel_id")
+
+    if not channel_id or not channel_id.startswith("UC"):
+        return jsonify({"error": "Invalid channelId"}), 400
+    if not my_channel_id or not my_channel_id.startswith("UC"):
+        return jsonify({"error": "Missing my_channel_id"}), 400
+
+    # Attempt to serve from cache
+    cached = get_cached_document(
+        mongo=current_app.extensions["pymongo"],
+        collection_name="channel_insights",
+        query={"channelId": channel_id, "myChannelId": my_channel_id},
+        ttl_minutes=1440
+    )
+
+    if cached:
+        cached.pop("_id", None)
+        return jsonify(cached.get("response"))
+
+    yt = get_youtube_client()
+
+    chan_info = yt.channels().list(
+        part="snippet,statistics,contentDetails",
+        id=channel_id
+    ).execute()
+
+    if not chan_info["items"]:
+        return jsonify({"error": "Channel not found"}), 404
+
+    meta = parse_channel_metadata(chan_info)
+    uploads_id = chan_info["items"][0]["contentDetails"]["relatedPlaylists"]["uploads"]
+
+    videos_res = fetch_channel_videos(yt, uploads_id, 5)
+    videos = videos_res.get("videos", [])
+    insights = analyze_channel_insights(meta["description"], videos)
+
+    if not insights or any(
+        insights.get(k, "Unknown") == "Unknown" for k in ["analyzedStyle", "analyzedNiche", "analyzedAttentionMarket"]
+    ):
+        return jsonify({"error": "Could not analyze channel — no videos or unknown insights"}), 400
+
+    mongo = current_app.extensions["pymongo"]
+    user_doc = mongo.db.users.find_one({"_id": ObjectId(data["user_id"])})
+
+    if not user_doc:
+        return jsonify({"error": "User not found"}), 400
+
+    my_profile = next(
+        (ch for ch in user_doc.get("channels", []) if ch.get("channelId") == my_channel_id),
+        None
+    )
+
+    if not my_profile:
+        return jsonify({"error": "Could not find your channel profile in your saved channels. Add it first."}), 400
+
+    user_attention_vector = embed_text(my_profile.get("analyzedAttentionMarket", ""))
+
+    comp_attention_vector = embed_text(insights["analyzedAttentionMarket"])
+    attention_similarity = cosine_similarity(comp_attention_vector, user_attention_vector)
+
+    user_niche_vector = embed_text(my_profile.get("analyzedNiche", "unknown"))
+    comp_niche_vector = embed_text(insights["analyzedNiche"])
+    niche_similarity = cosine_similarity(comp_niche_vector, user_niche_vector)
+
+    niche_match = niche_similarity >= 0.995
+    style_match = insights["analyzedStyle"].lower() == my_profile.get("analyzedStyle", "").lower()
+
+    my_main_topic = extract_main_topic(my_profile.get("analyzedNiche", "unknown"))
+    comp_main_topic = extract_main_topic(insights["analyzedNiche"])
+    topic_match = my_main_topic == comp_main_topic
+
+    try:
+        user_age, user_gender, user_motive_str = my_profile.get("analyzedAttentionMarket", "unknown, unknown, []").split(", ", 2)
+        comp_age, comp_gender, comp_motive_str = insights["analyzedAttentionMarket"].split(", ", 2)
+
+        user_motives = parse_motives(user_motive_str)
+        comp_motives = parse_motives(comp_motive_str)
+
+    except Exception:
+        user_age, user_gender, user_motives = "unknown", "unknown", []
+        comp_age, comp_gender, comp_motives = "unknown", "unknown", []
+
+    diff_count = 0
+    if user_age != comp_age:
+        diff_count += 1
+    if user_gender != comp_gender:
+        diff_count += 1
+    if len(set(user_motives) & set(comp_motives)) == 0:
+        diff_count += 1
+
+    if attention_similarity < 0.55 or diff_count >= 2:
+        competitor_type = "Non-Competitor"
+    elif attention_similarity < 0.7:
+        competitor_type = "Distant"
+    elif niche_match and style_match:
+        competitor_type = (
+            "Direct" if attention_similarity >= 0.85 else
+            "Indirect" if attention_similarity >= 0.75 else
+            "Adjacent"
+        )
+    elif topic_match:
+        competitor_type = (
+            "Indirect" if attention_similarity >= 0.75 else
+            "Adjacent" if attention_similarity >= 0.65 else
+            "Distant"
+        )
+    elif niche_match:
+        competitor_type = (
+            "Indirect" if attention_similarity >= 0.8 else
+            "Adjacent" if attention_similarity >= 0.7 else
+            "Distant"
+        )
+    elif style_match:
+        competitor_type = (
+            "Adjacent" if attention_similarity >= 0.8 else "Distant"
+        )
+    else:
+        competitor_type = "Distant"
+
+    response = {
+        "insights": {
+            "niche": insights["analyzedNiche"],
+            "style": insights["analyzedStyle"],
+            "attentionMarket": insights["analyzedAttentionMarket"],
+            "competitorType": competitor_type,
+            "attentionMarketSimilarity": round(attention_similarity, 3)
+        }
+    }
+
+    # Save computed insights to cache
+    update_cache_document(
+        mongo=mongo,
+        collection_name="channel_insights",
+        query={"channelId": channel_id, "myChannelId": my_channel_id},
+        new_data={
+            "response": response,
+            "fetchedAt": datetime.now(timezone.utc)
+        }
+    )
+
+    current_app.logger.info(
+        f"User {data['email']} ran insights on their {channel_id} vs {my_channel_id} "
+    )
+
+    return jsonify(response)

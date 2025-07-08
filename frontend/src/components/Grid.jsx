@@ -1,16 +1,17 @@
 function Grid({ items, renderCard, emptyMessage = "No items to display." }) {
   const gridStyle = {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-    justifyContent: 'start',
-    gap: '1.5rem',
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fill, minmax(250px, max-content))",
+    justifyContent: "start",
+    alignItems: "start",
+    gap: "1.5rem",
   };
 
   const emptyStyle = {
-    color: '#888',
-    fontSize: '1rem',
-    padding: '2rem 1rem',
-    textAlign: 'center',
+    color: "#888",
+    fontSize: "1rem",
+    padding: "2rem 1rem",
+    textAlign: "center",
   };
 
   return items.length === 0 ? (

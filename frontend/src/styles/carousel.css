@@ -1,0 +1,100 @@
+.carousel-wrapper {
+  position: relative;
+}
+
+.carousel-wrapper:hover .carousel-arrow {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.carousel-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 2rem;
+  background: transparent;
+  border: none;
+  color: white;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  z-index: 10;
+}
+
+.carousel-arrow:hover {
+  cursor: pointer;
+  color: #ccc;
+}
+
+.carousel-arrow:first-of-type {
+  left: 0;
+}
+
+.carousel-arrow:last-of-type {
+  right: 0;
+}
+
+.carousel-track {
+  display: flex;
+  gap: 1rem;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  padding-bottom: 1rem;
+  scrollbar-width: none; /* hide scrollbar on Firefox */
+  scroll-snap-type: x mandatory;
+
+}
+
+.carousel-track {
+  scroll-snap-type: x mandatory;
+}
+
+.carousel-item {
+  scroll-snap-align: start;
+}
+
+.carousel-track::-webkit-scrollbar {
+  display: none; /* hide scrollbar on Chrome/Safari */
+}
+
+.carousel-item {
+  flex: 0 0 auto;
+}
+
+.carousel-arrow {
+  position: absolute;
+  top: calc(50% - 50px);
+  transform: translateY(-50%);
+  z-index: 10;
+
+  background-color: rgba(0, 0, 0, 0.6);
+  border: none;
+  border-radius: 9999px;
+
+  width: 36px;
+  height: 36px;
+  font-size: 1.25rem;
+
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  cursor: pointer;
+}
+
+.carousel-wrapper:hover .carousel-arrow {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.carousel-arrow:first-of-type {
+  left: 0.25rem;
+}
+
+.carousel-arrow:last-of-type {
+  right: 0.25rem;
+}

@@ -1,0 +1,28 @@
+.info-card {
+  background-color: #1a1d21;
+  border-radius: 1rem;
+  padding: 1rem;
+  color: #ffffff;
+  font-size: 1rem;
+  line-height: 1.5;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.4);
+  transition: background-color 0.2s ease;
+  cursor: default;
+  user-select: text;
+  word-break: break-word;
+}
+
+.info-card:hover {
+  background-color: #22252b;
+}
+
+.info-main {
+  font-weight: 600;
+  font-size: 1rem;
+  margin-bottom: 0.25rem;
+}
+
+.info-subtext {
+  font-size: 0.875rem;
+  color: #aaa;
+}

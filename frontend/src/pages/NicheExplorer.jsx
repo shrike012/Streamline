@@ -1,150 +1,123 @@
-import React, { useState, useEffect } from 'react';
-import { searchNiche } from '../api/apiRoutes';
-import VideoCard from '../components/VideoCard';
-import ChannelCard from '../components/ChannelCard';
-import Grid from '../components/Grid';
+import React, { useState, useEffect } from "react";
+import { Helmet } from "react-helmet-async";
+import { searchNiche } from "../api/apiRoutes";
+import ChannelCard from "../components/ChannelCard";
+import Grid from "../components/Grid";
+import Filters from "../components/Filters";
+import useLoadingDots from "../utils/useLoadingDots";
+import { useChannel } from "../context/ChannelContext";
 
 function NicheExplorer() {
-  const STORAGE_KEY = 'niche_explorer_state';
-
-  const [type, setType] = useState('channels');
-  const [query, setQuery] = useState('');
+  const { selectedChannel } = useChannel();
+  const [timeFrame, setTimeFrame] = useState("last_month");
+  const [videoType, setVideoType] = useState("longform");
+  const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
+  const loadingText = useLoadingDots("Searching", 500);
   const [error, setError] = useState(null);
-
-  const [format, setFormat] = useState('any');
-  const [minOutlierScore, setMinOutlierScore] = useState(1);
-
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      setType(parsed.type || 'channels');
-      setQuery(parsed.query || '');
-      setResults(parsed.results || []);
-    }
-  }, []);
 
   const handleSearch = async (e) => {
     e.preventDefault();
-    if (!query.trim())sreturn;
+    if (!query.trim()) return;
 
     setLoading(true);
     setError(null);
+    setResults([]);
 
     try {
-      const data = await searchNiche(query, type, {
-        format,
-        minOutlierScore
-      });
+      const data = await searchNiche(query, { timeFrame, videoType });
 
-      const sorted = type === 'channels'
-        ? [...data].sort((a, b) => b.score - a.score)
-        : data;
-
-      setResults(sorted);
-
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({
-        type,
-        query,
-        results: sorted
-      }));
-
+      setResults(data);
+      sessionStorage.setItem("streamline_niche_query", query);
+      sessionStorage.setItem("streamline_niche_results", JSON.stringify(data));
     } catch (err) {
-      setError('Search failed. Please try again.');
+      setError("Search failed. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
+  useEffect(() => {
+    const savedQuery = sessionStorage.getItem("streamline_niche_query");
+    const savedResults = sessionStorage.getItem("streamline_niche_results");
+
+    if (savedQuery && savedResults) {
+      setQuery(savedQuery);
+      setResults(JSON.parse(savedResults));
+    }
+  }, []);
+
+  useEffect(() => {
+    setQuery("");
+    setResults([]);
+    setError(null);
+    sessionStorage.removeItem("streamline_niche_query");
+    sessionStorage.removeItem("streamline_niche_results");
+  }, [selectedChannel]);
+
   return (
     <>
+      <Helmet>
+        <title>Niche Explorer</title>
+      </Helmet>
       <h1 className="page-title">Niche Explorer</h1>
+      <form onSubmit={handleSearch}>
+        <div className="input-group-row">
+          <input
+            type="text"
+            placeholder="Search Channels"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="form-input"
+          />
 
-      <form onSubmit={handleSearch} className="input-group-row">
-        <input
-          type="text"
-          placeholder={`Search ${type}`}
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          className="form-input"
-        />
+          <Filters
+            filters={[
+              {
+                value: timeFrame,
+                onChange: setTimeFrame,
+                options: [
+                  { value: "last_week", label: "Last Week" },
+                  { value: "last_month", label: "Last Month" },
+                  { value: "last_year", label: "Last Year" },
+                  { value: "last_2_years", label: "Last 2 Years" },
+                ],
+              },
+              {
+                value: videoType,
+                onChange: setVideoType,
+                options: [
+                  { value: "shorts", label: "Shorts" },
+                  { value: "longform", label: "Longform" },
+                ],
+              },
+            ]}
+          />
 
-        <select
-          value={type}
-          onChange={(e) => {
-            setType(e.target.value);
-
-            if (e.target.value === 'videos') {
-              setFormat('any');
-              setMinOutlierScore(1);
-            }
-          }}
-          className="form-input"
-        >
-          <option value="channels">Channels</option>
-          <option value="videos">Videos</option>
-        </select>
-
-        {type === 'videos' && (
-          <>
-            <select
-              value={format}
-              onChange={(e) => setFormat(e.target.value)}
-              className="form-input"
-            >
-              <option value="any">Any Format</option>
-              <option value="shorts">Shorts</option>
-              <option value="longform">Longform</option>
-            </select>
-
-            <label className="slider-label">
-              Min Outlier Score: {minOutlierScore}
-            </label>
-            <input
-              type="range"
-              min="1"
-              max="50"
-              value={minOutlierScore}
-              onChange={(e) => setMinOutlierScore(Number(e.target.value))}
-            />
-          </>
-        )}
-
-        <button type="submit" className="button-primary">
-          Search
-        </button>
+          <button type="submit" className="button-primary" disabled={loading}>
+            {loading ? loadingText : "Search"}
+          </button>
+        </div>
       </form>
 
       {error && <p className="error-message">{error}</p>}
-      {loading && <p>Loading...</p>}
 
       <Grid
         items={results}
-        emptyMessage={`No ${type} found.`}
-        renderCard={(item, idx) =>
-          type === 'videos' ? (
-            <VideoCard
-              key={idx}
-              title={item.title}
-              thumbnail={item.thumbnail}
-              views={item.views}
-              timeAgo={item.timeAgo}
-              length={item.length}
-              videoId={item.videoId}
-              showActions={false}
-            />
-          ) : (
-            <ChannelCard
-              key={idx}
-              channelId={item.channelId}
-              title={item.title}
-              avatar={item.avatar}
-              subscriberCount={item.subscriberCount}
-            />
-          )
+        emptyMessage={
+          query.trim() !== "" && !loading ? "No channels found." : null
         }
+        renderCard={(channel, idx) => (
+          <ChannelCard
+            key={idx}
+            channelId={channel.channelId}
+            channelTitle={channel.channelTitle}
+            avatar={channel.avatar}
+            subscriberCount={channel.subscriberCount}
+            forceUniformSize={true}
+          />
+        )}
       />
     </>
   );

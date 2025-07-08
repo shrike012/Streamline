@@ -3,10 +3,11 @@
   box-sizing: border-box;
 }
 
-html, body {
+html,
+body {
   margin: 0;
   padding: 0;
-  font-family: 'Nunito', sans-serif;
+  font-family: "Nunito", sans-serif;
   background-color: #14181c;
   color: #f9fafb;
   line-height: 1.6;
@@ -15,7 +16,7 @@ html, body {
 .main-content {
   padding: 5rem 3rem 3rem 3rem;
   margin-left: 252px;
-  min-height: 100vh;
+  overflow-x: hidden;
 }
 
 @media (max-width: 1400px) {
@@ -28,6 +29,17 @@ html, body {
 .button-primary {
   background-color: #0972ce;
   color: white;
+  padding: 0.75rem 1.5rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.button-secondary {
+  background-color: white;
+  color: black;
   padding: 0.75rem 1.5rem;
   border: none;
   border-radius: 8px;
@@ -54,9 +66,9 @@ html, body {
   padding: 0.35rem 0.9rem;
   border-radius: 6px;
   color: #888;
-  font-size: 1.2rem;
+  font-size: 1rem;
   cursor: pointer;
-  font-weight: bold;
+  font-weight: 600;
 }
 
 .button-primary-sm {
@@ -65,8 +77,9 @@ html, body {
   padding: 0.5rem 1rem;
   border: 1px solid #444;
   border-radius: 8px;
-  font-size: 0.875rem;
-  font-weight: 600;
+  font-size: 1rem;
+  line-height: 1;
+  font-weight: 500;
   cursor: pointer;
 }
 
@@ -76,8 +89,9 @@ html, body {
   padding: 0.5rem 1rem;
   border-radius: 8px;
   color: #888;
-  font-size: 0.875rem;
-  font-weight: 600;
+  line-height: 1;
+  font-size: 1rem;
+  font-weight: 500;
   cursor: pointer;
 }
 
@@ -87,6 +101,7 @@ html, body {
   flex-wrap: wrap;
   gap: 0.75rem;
   margin-bottom: 1.5rem;
+  margin-top: 0.5rem;
   align-items: center;
 }
 
@@ -103,6 +118,11 @@ html, body {
   line-height: 1.2;
   vertical-align: middle;
   text-align: left;
+}
+
+.form-input:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.4);
 }
 
 .input-group-row .slider-label {

@@ -1,6 +1,6 @@
-import { createContext, useContext, useEffect, useState } from 'react';
-import { getMe, logout as logoutRequest } from '../api/apiRoutes.js';
-import { useNavigate } from 'react-router-dom';
+import { createContext, useContext, useEffect, useState } from "react";
+import { getMe, logout as logoutRequest } from "../api/apiRoutes.js";
+import { useNavigate } from "react-router-dom";
 
 const AuthContext = createContext();
 
@@ -15,7 +15,11 @@ export const AuthProvider = ({ children }) => {
     const checkAuth = async () => {
       const params = new URLSearchParams(window.location.search);
       if (params.get("token")) {
-        window.history.replaceState({}, document.title, window.location.pathname);
+        window.history.replaceState(
+          {},
+          document.title,
+          window.location.pathname,
+        );
       }
 
       try {
@@ -38,12 +42,23 @@ export const AuthProvider = ({ children }) => {
       console.error("Logout failed:", err);
     }
     setUser(null);
-    localStorage.removeItem('streamline_selected_channel');
-    navigate('/');
+    Object.keys(localStorage).forEach((key) => {
+      if (key.startsWith("streamline_")) {
+        localStorage.removeItem(key);
+      }
+    });
+    Object.keys(sessionStorage).forEach((key) => {
+      if (key.startsWith("streamline_")) {
+        sessionStorage.removeItem(key);
+      }
+    });
+    navigate("/");
   };
 
   return (
-    <AuthContext.Provider value={{ user, setUser, logout: logoutUser, loading }}>
+    <AuthContext.Provider
+      value={{ user, setUser, logout: logoutUser, loading }}
+    >
       {children}
     </AuthContext.Provider>
   );
