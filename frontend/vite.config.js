@@ -10,11 +10,14 @@ export default defineConfig({
       usePolling: true,
       interval: 100,
     },
-    proxy: {
-      "/api": {
-        target: "http://backend:8080", // used during local dev
-        changeOrigin: true,
+    // Only apply proxy in development
+    ...(process.env.NODE_ENV === "development" && {
+      proxy: {
+        "/api": {
+          target: import.meta.env.VITE_BACKEND_URL || "http://backend:8080",
+          changeOrigin: true,
+        },
       },
-    },
+    }),
   },
 });
