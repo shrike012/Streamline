@@ -1,0 +1,22 @@
+# Bytecode & cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtual environments
+venv/
+env/
+
+# Local config
+*.env
+*.log
+
+# Git & system files
+.git/
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.sqlite3
