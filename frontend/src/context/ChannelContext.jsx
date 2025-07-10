@@ -1,13 +1,13 @@
 import { createContext, useContext, useState, useEffect } from "react";
 
 const ChannelContext = createContext();
+const SESSION_STORAGE_KEY = "streamline_selected_channel";
 
 export const ChannelProvider = ({ children }) => {
-  const LOCAL_STORAGE_KEY = "streamline_selected_channel";
   const [selectedChannel, setSelectedChannel] = useState(null);
 
   useEffect(() => {
-    const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
+    const saved = sessionStorage.getItem(SESSION_STORAGE_KEY);
     if (saved) setSelectedChannel(JSON.parse(saved));
   }, []);
 
@@ -20,10 +20,10 @@ export const ChannelProvider = ({ children }) => {
         handle: channel.handle,
       };
       setSelectedChannel(channelInfo);
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(channelInfo));
+      sessionStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(channelInfo));
     } else {
       setSelectedChannel(null);
-      localStorage.removeItem(LOCAL_STORAGE_KEY);
+      sessionStorage.removeItem(SESSION_STORAGE_KEY);
     }
   };
 

@@ -1,14 +1,12 @@
 import statistics
 import re
-from nltk.tokenize import sent_tokenize
-from youtube_transcript_api import YouTubeTranscriptApi
 import json
 from flask import current_app
 from openai import OpenAI
 
 def compute_outlier_scores(videos):
     scores = []
-    view_counts = [v["viewCount"] for v in videos]
+    view_counts = [v.get("viewCount", 0) for v in videos]
 
     for i, vc in enumerate(view_counts):
         if vc == 0:
@@ -33,33 +31,16 @@ def compute_outlier_scores(videos):
     return scores
 
 def analyze_channel_insights(channel_description, videos):
-    SKIP_TRANSCRIPTS = False
     num_videos = len(videos)
     if num_videos == 0:
         return {
-            "niche": "Unknown",
-            "style": "Unknown",
-            "attention_market": "Unknown"
+            "analyzedNiche": "Unknown",
+            "analyzedStyle": "Unknown",
+            "analyzedAttentionMarket": "Unknown"
         }
 
-    video_titles = [f"{i+1}. {v['title']}" for i, v in enumerate(videos[:3])]
-    video_descriptions = [
-        f"{i+1}. {v['description'][:300]}"
-        for i, v in enumerate(videos[:3])
-    ]
-    transcripts = []
-    if not SKIP_TRANSCRIPTS:
-        for v in videos[:2]:
-            try:
-                fetched_transcript = YouTubeTranscriptApi().fetch(v["videoId"])
-                full_text = " ".join([snippet.text for snippet in fetched_transcript])
-            except Exception as e:
-                full_text = ""
-
-            if full_text.strip():
-                sentences = sent_tokenize(full_text)
-                trimmed_text = " ".join(sentences[:5])
-                transcripts.append(f"{v['title']}\n{trimmed_text}")
+    video_titles = [f"{i+1}. {v.get('title', '')}" for i, v in enumerate(videos[:3])]
+    video_descriptions = [f"{i+1}. {v.get('description', '')[:300]}" for i, v in enumerate(videos[:3])]
 
     prompt = f"""
 You are analyzing a YouTube channel to infer the likely attention_market and style.
@@ -74,9 +55,6 @@ Recent video titles:
 
 Recent video descriptions:
 {chr(5).join(video_descriptions)}
-
-Recent video transcripts:
-{chr(5).join(transcripts)}
 
 ---
 
@@ -169,6 +147,7 @@ Format:
     "attention_market": "..."
 }}
 """
+
     openai_client = OpenAI(api_key=current_app.config["OPENAI_API_KEY"])
 
     try:
@@ -184,13 +163,20 @@ Format:
         raw_reply = response.choices[0].message.content
 
         clean_reply = re.sub(r"^```(?:json)?|```$", "", raw_reply, flags=re.MULTILINE).strip()
-        parsed = json.loads(clean_reply)
+        try:
+            parsed = json.loads(clean_reply)
+        except json.JSONDecodeError:
+            current_app.logger.warning("OpenAI returned malformed JSON.")
+            return {
+                "analyzedNiche": "Unknown",
+                "analyzedStyle": "Unknown",
+                "analyzedAttentionMarket": "Unknown"
+            }
 
         niche = parsed.get("niche", "Unknown")
         style = parsed.get("style", "Unknown")
         attention_market = parsed.get("attention_market", "Unknown")
 
-        # If age_group is kids, force style = kids content
         try:
             age_group = attention_market.split(", ")[0]
             if age_group.lower() == "kids":
@@ -202,6 +188,7 @@ Format:
         niche = "Unknown"
         style = "Unknown"
         attention_market = "Unknown"
+        current_app.logger.error(f"OpenAI analysis failed: {e}")
 
     return {
         "analyzedNiche": niche,

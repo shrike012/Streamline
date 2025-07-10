@@ -1,17 +1,18 @@
 from flask import Blueprint, request, jsonify
-from utils.db import find_user_channel, update_user_channel, update_cache_document, get_cached_document
+from utils.db import find_user_channel, update_user_channel, get_redis_cache, set_redis_cache
 from utils.security import auth_and_csrf_required
 from bson.objectid import ObjectId
 from flask import current_app
 from datetime import datetime, timezone
 from utils.youtube_api import get_youtube_client
+from extensions import limiter, mongo
 
 competitor_tracker_bp = Blueprint("competitor_tracker", __name__)
 
 @competitor_tracker_bp.route("/lists/<channel_id>", methods=["GET"])
 @auth_and_csrf_required
+@limiter.limit("20 per minute")
 def get_competitor_lists(user_data, channel_id):
-    mongo = current_app.extensions["pymongo"]
     channel_doc = find_user_channel(mongo, user_data["user_id"], channel_id)
     if not channel_doc:
         return jsonify({"error": "Channel not found"}), 404
@@ -26,6 +27,7 @@ def get_competitor_lists(user_data, channel_id):
 
 @competitor_tracker_bp.route("/lists/<channel_id>/create", methods=["POST"])
 @auth_and_csrf_required
+@limiter.limit("5 per minute")
 def create_competitor_list(user_data, channel_id):
     data = request.get_json()
     name = data.get("name", "").strip()
@@ -37,7 +39,6 @@ def create_competitor_list(user_data, channel_id):
     if len(formatted_name) > 50:
         return jsonify({"error": "List name too long"}), 400
 
-    mongo = current_app.extensions["pymongo"]
     channel_doc = find_user_channel(mongo, user_data["user_id"], channel_id)
     if not channel_doc:
         return jsonify({"error": "Channel not found"}), 404
@@ -64,6 +65,7 @@ def create_competitor_list(user_data, channel_id):
 
 @competitor_tracker_bp.route("/lists/<channel_id>/<list_id>/rename", methods=["POST"])
 @auth_and_csrf_required
+@limiter.limit("5 per minute")
 def rename_competitor_list(user_data, channel_id, list_id):
     data = request.get_json()
     name = data.get("name", "").strip()
@@ -75,7 +77,6 @@ def rename_competitor_list(user_data, channel_id, list_id):
     if len(formatted_name) > 50:
         return jsonify({"error": "List name too long"}), 400
 
-    mongo = current_app.extensions["pymongo"]
     channel_doc = find_user_channel(mongo, user_data["user_id"], channel_id)
     if not channel_doc:
         return jsonify({"error": "Channel not found"}), 404
@@ -106,8 +107,8 @@ def rename_competitor_list(user_data, channel_id, list_id):
 
 @competitor_tracker_bp.route("/lists/<channel_id>/<list_id>/delete", methods=["POST"])
 @auth_and_csrf_required
+@limiter.limit("5 per minute")
 def delete_competitor_list(user_data, channel_id, list_id):
-    mongo = current_app.extensions["pymongo"]
     result = update_user_channel(
         mongo, user_data["user_id"], channel_id,
         {"$pull": {"channels.$.competitorLists": {"listId": ObjectId(list_id)}}}
@@ -118,8 +119,8 @@ def delete_competitor_list(user_data, channel_id, list_id):
 
 @competitor_tracker_bp.route("/competitors/<channel_id>/<list_id>", methods=["GET"])
 @auth_and_csrf_required
+@limiter.limit("30 per minute")
 def get_competitors_in_list(user_data, channel_id, list_id):
-    mongo = current_app.extensions["pymongo"]
     channel_doc = find_user_channel(mongo, user_data["user_id"], channel_id)
     if not channel_doc:
         return jsonify({"error": "Channel not found"}), 404
@@ -139,13 +140,13 @@ def get_competitors_in_list(user_data, channel_id, list_id):
 
 @competitor_tracker_bp.route("/competitors/<channel_id>/<list_id>/add", methods=["POST"])
 @auth_and_csrf_required
+@limiter.limit("10 per minute")
 def add_competitor(user_data, channel_id, list_id):
     data = request.get_json()
     competitor_channel_id = data.get("competitorChannelId", "").strip()
     if not competitor_channel_id:
         return jsonify({"error": "Missing competitor_channel_id"}), 400
 
-    mongo = current_app.extensions["pymongo"]
     channel_doc = find_user_channel(mongo, user_data["user_id"], channel_id)
     if not channel_doc:
         return jsonify({"error": "Channel not found"}), 404
@@ -162,13 +163,13 @@ def add_competitor(user_data, channel_id, list_id):
     if already_exists:
         return jsonify({"error": "Competitor already added to this list"}), 400
 
+    if len(target_list.get("competitors", [])) >= 100:
+        return jsonify({"error": "Competitor list has reached the limit."}), 400
+
     # Try cached metadata first
-    cached = get_cached_document(
-        mongo=mongo,
-        collection_name="channel_metadata",
-        query={"channelId": competitor_channel_id},
-        ttl_minutes=1440
-    )
+    redis = current_app.extensions["redis"]
+    cache_key = f"channel_metadata:{competitor_channel_id}"
+    cached = get_redis_cache(redis, cache_key)
 
     if cached:
         channel_title = cached["channelTitle"]
@@ -190,17 +191,12 @@ def add_competitor(user_data, channel_id, list_id):
         avatar = snippet.get("thumbnails", {}).get("default", {}).get("url", "")
         subscriber_count = int(statistics.get("subscriberCount", 0))
 
-        update_cache_document(
-            mongo=mongo,
-            collection_name="channel_metadata",
-            query={"channelId": competitor_channel_id},
-            new_data={
-                "channelId": competitor_channel_id,
-                "channelTitle": channel_title,
-                "avatar": avatar,
-                "subscriberCount": subscriber_count,
-            }
-        )
+        set_redis_cache(redis, cache_key, {
+            "channelId": competitor_channel_id,
+            "channelTitle": channel_title,
+            "avatar": avatar,
+            "subscriberCount": subscriber_count,
+        }, ttl_seconds=86400)
 
     new_competitor = {
         "competitorChannelId": competitor_channel_id,
@@ -227,13 +223,13 @@ def add_competitor(user_data, channel_id, list_id):
 
 @competitor_tracker_bp.route("/competitors/<channel_id>/<list_id>/remove", methods=["POST"])
 @auth_and_csrf_required
+@limiter.limit("10 per minute")
 def remove_competitor(user_data, channel_id, list_id):
     data = request.get_json()
     competitor_channel_id = data.get("competitor_channel_id", "").strip()
     if not competitor_channel_id:
         return jsonify({"error": "Missing competitor_channel_id"}), 400
 
-    mongo = current_app.extensions["pymongo"]
     result = update_user_channel(
         mongo, user_data["user_id"], channel_id,
         {

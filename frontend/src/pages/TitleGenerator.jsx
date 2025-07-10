@@ -17,6 +17,25 @@ function TitleGenerator() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
+    const savedChannel = sessionStorage.getItem("streamline_selected_channel");
+    const savedIdea = sessionStorage.getItem("streamline_title_idea");
+    const savedTitles = sessionStorage.getItem("streamline_title_results");
+
+    const parsedChannel = savedChannel ? JSON.parse(savedChannel) : null;
+
+    if (
+      selectedChannel &&
+      parsedChannel &&
+      selectedChannel.channelId === parsedChannel.channelId &&
+      savedIdea &&
+      savedTitles
+    ) {
+      setIdea(savedIdea);
+      setTitles(JSON.parse(savedTitles));
+    }
+  }, [selectedChannel]);
+
+  useEffect(() => {
     if (location.state?.initialIdea) {
       setIdea(location.state.initialIdea);
       setTimeout(() => {
@@ -33,6 +52,11 @@ function TitleGenerator() {
       return;
     }
 
+    if (ideaToUse.length > 100) {
+      setError("Idea is too long (keep it under 100 characters).");
+      return;
+    }
+
     setLoading(true);
     setError(null);
     setTitles([]);
@@ -41,6 +65,16 @@ function TitleGenerator() {
       const res = await generateTitle(ideaToUse, selectedChannel.channelId);
       const titlesList = Array.isArray(res.titles) ? res.titles : [];
       setTitles(titlesList);
+
+      sessionStorage.setItem("streamline_title_idea", ideaToUse);
+      sessionStorage.setItem(
+        "streamline_title_results",
+        JSON.stringify(titlesList),
+      );
+      sessionStorage.setItem(
+        "streamline_selected_channel",
+        JSON.stringify(selectedChannel),
+      );
     } catch (err) {
       console.error("Failed to generate titles:", err);
       setError("Failed to generate titles. Please try again.");
@@ -59,38 +93,65 @@ function TitleGenerator() {
 
         {!selectedChannel ? (
           <p style={{ padding: "2rem", color: "#888", textAlign: "center" }}>
-            Please add a channel before using the Title Generator.
+            Add a channel to use the Title Generator.
           </p>
         ) : (
           <>
             {error && <p className="error-message">{error}</p>}
 
-            <div
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleGenerate();
+              }}
               className="input-group-row"
-              style={{ gap: "1rem", marginBottom: "2rem" }}
+              style={{
+                gap: "1rem",
+                marginBottom: "2rem",
+                flexDirection: "column",
+                alignItems: "flex-start",
+              }}
             >
-              <input
-                type="text"
-                className="form-input"
-                placeholder="Enter your video idea..."
-                value={idea}
-                onChange={(e) => setIdea(e.target.value)}
+              <div
                 style={{
-                  flex: 1,
-                  minWidth: 0,
-                  maxWidth: "400px",
-                  whiteSpace: "nowrap",
-                  overflowX: "auto",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: "1rem",
+                  width: "100%",
+                  maxWidth: "500px",
                 }}
-              />
-              <button
-                className="button-primary"
-                onClick={() => handleGenerate()}
-                disabled={loading}
               >
-                {loading ? loadingText : "Generate Titles"}
-              </button>
-            </div>
+                <input
+                  type="text"
+                  className="form-input"
+                  placeholder="Enter your video idea..."
+                  value={idea}
+                  maxLength={100}
+                  onChange={(e) => {
+                    setIdea(e.target.value);
+                    if (error) setError(null);
+                  }}
+                  style={{
+                    flex: 1,
+                    minWidth: 0,
+                    whiteSpace: "nowrap",
+                    overflowX: "auto",
+                    borderColor: idea.length > 100 ? "red" : undefined,
+                  }}
+                />
+                <button
+                  type="submit"
+                  className="button-primary"
+                  disabled={loading}
+                  style={{
+                    minWidth: "160px",
+                    textAlign: "center",
+                  }}
+                >
+                  {loading ? loadingText : "Generate Titles"}
+                </button>
+              </div>
+            </form>
 
             {titles.length > 0 && (
               <div className="generated-titles">

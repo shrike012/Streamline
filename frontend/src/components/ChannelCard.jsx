@@ -32,7 +32,7 @@ function ChannelCard({
         textDecoration: "none",
         color: "inherit",
         cursor: "pointer",
-        ...(forceUniformSize && { width: "280px", height: "100px" }),
+        ...(forceUniformSize && { width: "260px", height: "90px" }),
       }}
       onClick={handleCardClick}
     >

@@ -12,6 +12,7 @@ import InfoCard from "../components/InfoCard";
 import Filters from "../components/Filters.jsx";
 import { useChannel } from "../context/ChannelContext";
 import sortVideos from "../utils/sortVideos.js";
+import useLoadingDots from "../utils/useLoadingDots";
 import "../styles/channel.css";
 
 function Channel() {
@@ -29,6 +30,9 @@ function Channel() {
     longform: null,
     shorts: null,
   });
+  const loadingChannelVideos = useLoadingDots("Loading videos", 500);
+  const [insightsLoading, setInsightsLoading] = useState(false);
+  const loadingInsightsDots = useLoadingDots("Loading insights", 500);
 
   useEffect(() => {
     const loadChannel = async () => {
@@ -57,12 +61,14 @@ function Channel() {
   useEffect(() => {
     const loadInsights = async () => {
       if (tab !== "insights" || !id || !selectedChannel?.channelId) return;
+      setInsightsLoading(true);
       try {
         const res = await fetchChannelInsights(id, selectedChannel.channelId);
         setInsights(res?.insights || null);
       } catch (err) {
         console.error("Failed to fetch channel insights:", err);
       }
+      setInsightsLoading(false);
     };
 
     loadInsights();
@@ -155,7 +161,7 @@ function Channel() {
             <div
               style={{ padding: "2rem", color: "#888", textAlign: "center" }}
             >
-              Loading videos...
+              {loadingChannelVideos}
             </div>
           ) : videos.length > 0 ? (
             <>
@@ -171,7 +177,8 @@ function Channel() {
                     length={video.length}
                     videoId={video.videoId}
                     outlierScore={video.outlierScore}
-                    channelTitle={channelInfo?.title || ""}
+                    channelTitle={channelInfo?.channelTitle}
+                    channelId={channelInfo?.channelId}
                     showChannelTitle={false}
                   />
                 )}
@@ -199,22 +206,31 @@ function Channel() {
           )}
         </>
       )}
-      {tab === "insights" && insights && (
-        <Grid
-          items={[
-            { text: insights.niche || "N/A", subtext: "Niche" },
-            { text: insights.style || "N/A", subtext: "Style" },
-            { text: insights.attentionMarket || "N/A", subtext: "Audience" },
-            {
-              text: insights.competitorType || "N/A",
-              subtext: "Competitor Type",
-            },
-          ]}
-          renderCard={(item, idx) => (
-            <InfoCard key={idx} text={item.text} subtext={item.subtext} />
-          )}
-        />
-      )}
+      {tab === "insights" &&
+        (insightsLoading ? (
+          <div style={{ padding: "2rem", color: "#888", textAlign: "center" }}>
+            {loadingInsightsDots}
+          </div>
+        ) : insights ? (
+          <Grid
+            items={[
+              { text: insights.niche || "N/A", subtext: "Niche" },
+              { text: insights.style || "N/A", subtext: "Style" },
+              { text: insights.attentionMarket || "N/A", subtext: "Audience" },
+              {
+                text: insights.competitorType || "N/A",
+                subtext: "Competitor Type",
+              },
+            ]}
+            renderCard={(item, idx) => (
+              <InfoCard key={idx} text={item.text} subtext={item.subtext} />
+            )}
+          />
+        ) : (
+          <div style={{ padding: "2rem", color: "#888", textAlign: "center" }}>
+            No insights available.
+          </div>
+        ))}
     </div>
   );
 }

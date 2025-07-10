@@ -8,8 +8,8 @@ function InfoCard({ text, subtext = "", onClick = null }) {
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
     >
-      <div className="info-main">{text}</div>
       {subtext && <div className="info-subtext">{subtext}</div>}
+      <div className="info-main">{text}</div>
     </div>
   );
 }

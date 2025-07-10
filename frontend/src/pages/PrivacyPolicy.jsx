@@ -19,14 +19,19 @@ const PrivacyPolicy = () => (
     <h2 style={{ marginTop: "2rem" }}>1. Information We Collect</h2>
     <p>
       - Account information: When you sign up, we collect your email.
-      <br />- Usage data: We collect logs of interactions for app functionality
-      and debugging.
+      <br />
+      - Usage data: We collect logs of your interactions with the app to ensure
+      proper functionality, monitor performance, and debug issues.
+      <br />- Device and session data: We may store authentication tokens or
+      user preferences in your browser’s local storage to keep you signed in and
+      personalize your experience.
     </p>
 
     <h2 style={{ marginTop: "2rem" }}>2. How We Use Your Information</h2>
     <p>
       - Provide and improve our service.
-      <br />- Communicate with you about your account.
+      <br />
+      - Communicate with you about your account.
       <br />- Display in-app notifications if you enable them.
     </p>
 
@@ -51,14 +56,19 @@ const PrivacyPolicy = () => (
 
     <h2 style={{ marginTop: "2rem" }}>6. Security</h2>
     <p>
-      We take reasonable measures to protect your information, but no system is
-      100% secure.
+      We take reasonable measures to protect your information, including
+      limiting access to authorized personnel only. However, no system is 100%
+      secure.
     </p>
 
     <h2 style={{ marginTop: "2rem" }}>7. Changes</h2>
     <p>
       We may update this policy. We will notify you of significant changes by
       email or in-app.
+    </p>
+
+    <p style={{ marginTop: "2rem" }}>
+      By using Streamline, you agree to the terms of this Privacy Policy.
     </p>
 
     <p style={{ marginTop: "2rem" }}>

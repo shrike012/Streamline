@@ -1,42 +1,23 @@
-from datetime import datetime, timezone
+from datetime import timedelta
 from bson import ObjectId
+import json
 
-def get_cached_document(mongo, collection_name, query, ttl_minutes=10):
+def get_redis_cache(redis, key):
     """
-    Fetch a cached document from MongoDB and check freshness.
+    Get a cached value from Redis and decode it as JSON.
+    Returns None if the key is missing or decoding fails.
+    """
+    try:
+        val = redis.get(key)
+        return json.loads(val) if val else None
+    except Exception:
+        return None
 
-    Returns:
-        - cached document dict if found & fresh
-        - None if missing or stale
+def set_redis_cache(redis, key, value, ttl_seconds=600):
     """
-    collection = mongo.db[collection_name]
-    cached = collection.find_one(query)
-
-    if cached:
-        fetched_at = cached.get("fetchedAt")
-        if fetched_at:
-            if fetched_at.tzinfo is None:
-                fetched_at = fetched_at.replace(tzinfo=timezone.utc)
-            age_minutes = (datetime.now(timezone.utc) - fetched_at).total_seconds() / 60
-            if age_minutes < ttl_minutes:
-                return cached
-    return None
-
-def update_cache_document(mongo, collection_name, query, new_data):
+    Set a value in Redis with a TTL, encoding as JSON.
     """
-    Upserts new data with fetchedAt timestamp.
-    """
-    collection = mongo.db[collection_name]
-    collection.update_one(
-        query,
-        {
-            "$set": {
-                **new_data,
-                "fetchedAt": datetime.now(timezone.utc)
-            }
-        },
-        upsert=True
-    )
+    redis.setex(key, timedelta(seconds=ttl_seconds), json.dumps(value))
 
 def find_user_channel(mongo, user_id, channel_id):
     """

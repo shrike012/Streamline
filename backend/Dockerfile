@@ -2,19 +2,18 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-# Install dependencies
-RUN apt-get update && \
-    apt-get install -y cron && \
-    rm -rf /var/lib/apt/lists/*
-
+# Install only what's needed
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir gunicorn && \
+    pip install --no-cache-dir -r requirements.txt
 
-# Download NLTK punkt tokenizer (for sentence splitting)
+# Download NLTK tokenizer
 RUN python -m nltk.downloader punkt
 
+# Copy app code
 COPY . .
 
 EXPOSE 8080
 
-CMD ["python", "app.py"]
+# Use Gunicorn for production
+CMD ["gunicorn", "--bind", "0.0.0.0:8080", "app:app"]

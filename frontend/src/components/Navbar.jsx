@@ -50,7 +50,7 @@ const Navbar = ({ toggleSidebar }) => {
 
   const channelDropdownRef = useRef();
   const notificationDropdownRef = useRef();
-  const { user, logout, loading } = useAuth();
+  const { _, logout, loading } = useAuth();
   const { selectedChannel, updateChannel } = useChannel();
   const [channels, setChannels] = useState([]);
 
@@ -77,9 +77,7 @@ const Navbar = ({ toggleSidebar }) => {
       try {
         const res = await getNotifications(selectedChannel.channelId);
         setNotifications(res);
-      } catch (err) {
-        console.error("Failed to fetch notifications:", err);
-      }
+      } catch {}
     }
     fetchNotifications();
   }, [selectedChannel]);
@@ -106,7 +104,7 @@ const Navbar = ({ toggleSidebar }) => {
   }, []);
 
   useEffect(() => {
-    syncChannelsAndSelected(setChannels, updateChannel).catch(console.error);
+    syncChannelsAndSelected(setChannels, updateChannel).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -130,9 +128,7 @@ const Navbar = ({ toggleSidebar }) => {
       try {
         await markNotificationsRead(selectedChannel.channelId);
         setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-      } catch (err) {
-        console.error("Failed to mark notifications read:", err);
-      }
+      } catch (err) {}
     }
   };
 
@@ -143,8 +139,6 @@ const Navbar = ({ toggleSidebar }) => {
     setSearchQuery("");
     setSearchResults([]);
     setSearchErrors({});
-    setPendingChannelId("");
-    setPendingTitle("");
     setSearchPerformed(false);
     setForm({
       newEmail: "",
@@ -169,7 +163,7 @@ const Navbar = ({ toggleSidebar }) => {
     }
   };
 
-  const handleSelectFromSearch = async (channelId, title) => {
+  const handleSelectFromSearch = async (channelId) => {
     setIsSubmitting(true);
     setSearchResults([]);
     setSearchPerformed(false);
@@ -181,6 +175,7 @@ const Navbar = ({ toggleSidebar }) => {
       updateChannel(newChannel);
       setDropdownOpen(false);
       closeAllModals();
+      navigate("/app/dashboard");
     } catch (err) {
       alert(err?.response?.data?.error || "Failed to add channel.");
     } finally {
@@ -193,9 +188,11 @@ const Navbar = ({ toggleSidebar }) => {
       await removeChannel(channelId);
       const updated = channels.filter((ch) => ch.channelId !== channelId);
       setChannels(updated);
+
       if (selectedChannel?.channelId === channelId) {
         updateChannel(updated[0] || null);
       }
+
       closeAllModals();
       setDropdownOpen(false);
     } catch (err) {
@@ -450,7 +447,7 @@ const Navbar = ({ toggleSidebar }) => {
       {/* Search Modal */}
       <Modal
         isOpen={showSearchModal}
-        onClose={closeAllModals}
+        onClose={isSubmitting ? null : closeAllModals}
         title="Search for Your Channel"
         fields={[]}
         formData={{}}
@@ -481,9 +478,7 @@ const Navbar = ({ toggleSidebar }) => {
                   channelId={ch.channelId}
                   subscriberCount={ch.subscriberCount}
                   navigateOnClick={false}
-                  onAdd={() =>
-                    handleSelectFromSearch(ch.channelId, ch.channelTitle)
-                  }
+                  onAdd={() => handleSelectFromSearch(ch.channelId)}
                 />
               ))}
             </div>

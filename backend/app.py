@@ -1,81 +1,77 @@
-from logging.handlers import RotatingFileHandler
-from flask import Flask, request, current_app, jsonify
+from flask import Flask, current_app, jsonify
+from flask_limiter.errors import RateLimitExceeded
 from flask_cors import CORS
-from flask_pymongo import PyMongo
-import os, logging, atexit
+from werkzeug.middleware.proxy_fix import ProxyFix
+from redis import Redis
 from dotenv import load_dotenv
-from flask_limiter import Limiter
-from flask_limiter.util import get_remote_address
+import os, logging, atexit, sys
+from extensions import mongo, limiter
 
+# --- Load and validate environment variables ---
 load_dotenv()
 
-app = Flask(__name__)
-CORS(app, supports_credentials=True, origins=[
-    "http://localhost:5173",
-])
+required_env_vars = [
+    "FRONTEND_ORIGIN", "MONGO_URI", "JWT_KEY", "JWT_REFRESH_KEY",
+    "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REDIRECT_URI",
+    "FRONTEND_REDIRECT_URI", "FRONTEND_PASSWORD_RESET_URL",
+    "RESEND_API_KEY", "REDIS_URI"
+]
+for var in required_env_vars:
+    if not os.getenv(var):
+        raise RuntimeError(f"Missing required environment variable: {var}")
 
-limiter = Limiter(
-    get_remote_address,
-    app=app,
-    default_limits=["10000 per day", "5000 per hour"],
-    storage_uri=os.getenv("REDIS_URI")
+# --- App Initialization ---
+app = Flask(__name__)
+app.config["ENV"] = os.getenv("FLASK_ENV", "development")
+app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1)
+
+# --- CORS Configuration ---
+CORS(app, supports_credentials=True, origins=[os.getenv("FRONTEND_ORIGIN")])
+
+# --- Secure Cookie & Upload Limits ---
+app.config.update(
+    SESSION_COOKIE_SECURE=True,
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    MAX_CONTENT_LENGTH=2 * 1024 * 1024,  # 2MB max request body
 )
 
-# Configuration
-app.config["MONGO_URI"] = os.getenv("MONGO_URI")
-app.config["JWT_KEY"] = os.getenv("JWT_KEY")
-app.config["GOOGLE_CLIENT_ID"] = os.getenv("GOOGLE_CLIENT_ID")
-app.config["GOOGLE_CLIENT_SECRET"] = os.getenv("GOOGLE_CLIENT_SECRET")
-app.config["GOOGLE_REDIRECT_URI"] = os.getenv("GOOGLE_REDIRECT_URI")
-app.config["FRONTEND_REDIRECT_URI"] = os.getenv("FRONTEND_REDIRECT_URI")
-app.config["FRONTEND_PASSWORD_RESET_URL"] = os.getenv("FRONTEND_PASSWORD_RESET_URL")
-app.config["RESEND_API_KEY"] = os.getenv("RESEND_API_KEY")
-app.config["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
+# --- App Config ---
+app.config.update(
+    MONGO_URI=os.getenv("MONGO_URI"),
+    JWT_KEY=os.getenv("JWT_KEY"),
+    JWT_REFRESH_KEY=os.getenv("JWT_REFRESH_KEY"),
+    GOOGLE_CLIENT_ID=os.getenv("GOOGLE_CLIENT_ID"),
+    GOOGLE_CLIENT_SECRET=os.getenv("GOOGLE_CLIENT_SECRET"),
+    GOOGLE_REDIRECT_URI=os.getenv("GOOGLE_REDIRECT_URI"),
+    FRONTEND_REDIRECT_URI=os.getenv("FRONTEND_REDIRECT_URI"),
+    FRONTEND_PASSWORD_RESET_URL=os.getenv("FRONTEND_PASSWORD_RESET_URL"),
+    RESEND_API_KEY=os.getenv("RESEND_API_KEY"),
+    OPENAI_API_KEY=os.getenv("OPENAI_API_KEY"),
+    REDIS_URI=os.getenv("REDIS_URI"),
+    YT_API_KEYS=[k.strip() for k in os.getenv("GOOGLE_YT_API_KEYS", "").split(",") if k.strip()],
+)
 
-# Load YouTube API keys
-yt_keys = os.getenv("GOOGLE_YT_API_KEYS", "").split(",")
-yt_keys = [k.strip() for k in yt_keys if k.strip()]
-if not yt_keys:
-    raise ValueError("Missing GOOGLE_YT_API_KEYS in .env")
-app.config["YT_API_KEYS"] = yt_keys
+# --- Init MongoDB + Redis + Rate Limiter ---
+mongo.init_app(app)
+redis_client = Redis.from_url(
+    app.config["REDIS_URI"],
+    decode_responses=True,
+    socket_connect_timeout=5,
+    socket_timeout=5,
+    retry_on_timeout=True
+)
+app.extensions["redis"] = redis_client
+limiter.init_app(app)
 
-# Mongo
-mongo = PyMongo(app)
-app.extensions["pymongo"] = mongo
-
-# Logging
-log_dir = "/logs"
-os.makedirs(log_dir, exist_ok=True)
-log_path = os.path.join(log_dir, "app.log")
-
-file_handler = RotatingFileHandler(log_path, maxBytes=1_000_000, backupCount=3)
-file_handler.setLevel(logging.ERROR)
-file_handler.setFormatter(logging.Formatter(
-    "%(asctime)s [%(levelname)s] %(message)s"
-))
-app.logger.addHandler(file_handler)
+# --- Logging Setup ---
 app.logger.setLevel(logging.INFO)
+handler = logging.StreamHandler(sys.stdout)
+handler.setLevel(logging.INFO)
+handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
+app.logger.addHandler(handler)
 
-@app.before_request
-def log_request_info():
-    path = request.path
-    skip_paths = {
-        "/api/auth/me",
-        "/api/auth/login",
-        "/api/auth/google",
-        "/api/auth/google/callback",
-        "/api/auth/request-reset",
-        "/api/auth/reset-password",
-        "/api/channel/list",
-    }
-
-    if path.startswith("/static") or path in skip_paths:
-        return
-
-    ip = request.headers.get("X-Forwarded-For", request.remote_addr)
-    app.logger.info(f"Request from {ip}: {request.method} {path}")
-
-# Register blueprints
+# --- Register Blueprints ---
 from routes.auth import auth_bp
 from routes.channel import channel_bp
 from routes.collections import collections_bp
@@ -96,33 +92,26 @@ app.register_blueprint(generators_bp, url_prefix="/api/generators")
 app.register_blueprint(notifications_bp, url_prefix="/api/notifications")
 app.register_blueprint(outliers_bp, url_prefix="/api/outliers")
 
+# --- Error Handlers ---
 @app.errorhandler(Exception)
 def handle_exception(e):
     current_app.logger.exception("Unhandled exception")
     return jsonify({"error": "An internal server error occurred."}), 500
 
+@app.errorhandler(RateLimitExceeded)
+def handle_rate_limit(e):
+    return jsonify({"error": "Too many requests. Please slow down."}), 429
+
+# --- APScheduler Setup ---
 def run_in_app_context(func):
     with app.app_context():
         func()
 
-# APScheduler for daily outlier refresh and competitor upload notifications
 from apscheduler.schedulers.background import BackgroundScheduler
 from utils.scheduled_jobs import refresh_all_outliers_for_all_users, check_competitors_for_all_users
 
 scheduler = BackgroundScheduler()
-scheduler.add_job(
-    lambda: run_in_app_context(refresh_all_outliers_for_all_users),
-    trigger="cron",
-    hour=3
-)
-scheduler.add_job(
-    lambda: run_in_app_context(check_competitors_for_all_users),
-    trigger="cron",
-    minute=0
-)
+scheduler.add_job(lambda: run_in_app_context(refresh_all_outliers_for_all_users), trigger="cron", hour=3)
+scheduler.add_job(lambda: run_in_app_context(check_competitors_for_all_users), trigger="cron", minute=0)
 scheduler.start()
 atexit.register(lambda: scheduler.shutdown())
-
-# Run
-if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=8080)

@@ -3,39 +3,54 @@ from utils.db import find_user_channel
 from utils.security import auth_and_csrf_required
 from openai import OpenAI
 import json
+from extensions import limiter, mongo
+from utils.youtube_api import get_youtube_client, fetch_channel_videos
+from utils.parser import parse_channel_metadata
 
 generators_bp = Blueprint("generators", __name__)
 
 @generators_bp.route("/title", methods=["POST"])
 @auth_and_csrf_required
+@limiter.limit("5 per minute")
 def generate_title(data):
     body = request.get_json()
     idea_text = body.get("idea", "").strip()
+    idea_text = idea_text.replace("\n", " ").strip()
+    if len(idea_text) > 200:
+        return jsonify({"error": "Idea text is too long (max 200 characters)"}), 400
+
     channel_id = body.get("channelId")
 
     if not idea_text or not channel_id:
         return jsonify({"error": "Missing required fields: idea, channelId"}), 400
 
-    mongo = current_app.extensions["pymongo"]
     profile = find_user_channel(mongo, data["user_id"], channel_id)
     if not profile:
         return jsonify({"error": "Could not find your channel profile. Add it first."}), 400
 
-    niche = profile.get("analyzedNiche", "unknown")
-    style = profile.get("analyzedStyle", "unknown")
-    market = profile.get("analyzedAttentionMarket", "unknown")
+    yt = get_youtube_client()
 
-    cached_videos_doc = mongo.db.channel_videos.find_one({
-        "channelId": channel_id,
-        "contentType": "longform"
-    })
+    chan_info = yt.channels().list(
+        part="snippet,contentDetails",
+        id=channel_id
+    ).execute()
 
-    recent_titles = []
-    if cached_videos_doc and "videos" in cached_videos_doc:
-        recent_titles = [v.get("title", "") for v in cached_videos_doc["videos"][:5]]
+    if not chan_info.get("items"):
+        return jsonify({"error": "Channel not found"}), 404
+
+    meta = parse_channel_metadata(chan_info)
+
+    videos_res = fetch_channel_videos(yt, meta["uploadsId"], max_videos=15)
+    videos = videos_res.get("videos", [])
+
+    recent_titles = [
+        v.get("title", "")
+        for v in videos
+        if not v.get("isShort", False)
+    ][:5]
 
     prompt = f"""
-You are an expert YouTube strategist. Your task is to turn the user’s new video idea into 10 viral, click-worthy YouTube titles. These titles must seamlessly match the user's existing channel content and follow all formatting and tonal rules exactly.
+You are an expert YouTube strategist. Your task is to turn the user’s new video idea into 10 viral, click-worthy YouTube titles. These titles must closely match the user's existing channel style and follow all formatting and tonal rules below.
 
 ---
 
@@ -61,30 +76,30 @@ Target Audience: '{profile.get("analyzedAttentionMarket", "unknown")}'
 1. Respond with **only a raw JSON array** of 10 titles. No explanation, no markdown, no headings. Example:
 ["Title 1", "Title 2", "Title 3", ..., "Title 10"]
 
-2. At least **3 of the 10 titles must follow the same structural format** as the user's recent titles. Detect common patterns or templates in their titles (e.g. “You Wouldn’t Last…”, “How X Became Y”, “The Most…”, etc.) and replicate those formats.
+2. Before writing titles, **carefully analyze the user's recent titles**. Detect the structural formats or templates (e.g. “You Wouldn’t Last…”, “How X Became Y”, “The Most…”, etc.) and replicate these structures precisely. 
+- At least **3 of the 10 titles must reuse formats found in the recent titles**.
+- If strong patterns are present, **prioritize mimicking them** over inventing new ones.
 
 3. Titles must be:
 - **Only one sentence**
-- **CONCISE** (under 110 characters recommended)
-- **NO COLONS** or subtitles (e.g., avoid: "X: The Story of Y")
+- **Concise** (under 110 characters is ideal)
+- **No colons or subtitles** (e.g., avoid: "X: The Story of Y")
 
-4. Do **not** start more than two titles with the same phrase (e.g. "How", "Why", "The Most").
-
-5. Match the tone of the channel's past titles:
+4. Match the tone of the past titles:
 - Serious, bold, emotionally charged
-- No jokes, sarcasm, or generic phrasing
-- Never use casual YouTube language (no "Top 10", "Insane", etc.)
+- No sarcasm, jokes, or generic phrasing
+- Never use casual YouTube tropes (e.g. “Top 10”, “This Will Shock You”, “Insane”, etc.)
 
-6. Use **emotionally gripping tactics**:
-- Pain, death, failure, betrayal, injustice, revenge, fear, survival
-- Curiosity and mystery: hidden, forbidden, secret, lost
-- Superlatives: most, worst, smartest, deadliest, fastest
+5. Use **emotionally gripping strategies**:
+- Highlight pain, death, failure, injustice, betrayal, fear, or survival
+- Use curiosity: hidden, secret, forbidden, lost
+- Use superlatives: most, worst, greatest, smartest, deadliest
 
 ---
 
-Stick to these rules exactly. Do not improvise or break format.
+You must stick to these instructions exactly. Do not break format or ignore constraints.
 """
-
+    current_app.logger.info(f"[Title Generator Prompt] {prompt}")
     openai_client = OpenAI(api_key=current_app.config["OPENAI_API_KEY"])
     try:
         response = openai_client.chat.completions.create(

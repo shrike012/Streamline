@@ -1,10 +1,10 @@
 function Grid({ items, renderCard, emptyMessage = "No items to display." }) {
   const gridStyle = {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(250px, max-content))",
+    gridTemplateColumns: "repeat(auto-fill, 250px)",
     justifyContent: "start",
     alignItems: "start",
-    gap: "1.5rem",
+    gap: "2.5rem",
   };
 
   const emptyStyle = {

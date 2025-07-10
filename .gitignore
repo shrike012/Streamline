@@ -5,6 +5,8 @@
 # Python
 venv/
 __pycache__/
+**/__pycache__/
+**/*.py[cod]
 *.py[cod]
 *.log
 *.pyd
@@ -34,3 +36,6 @@ Thumbs.db
 # Logs (only keep .gitkeep)
 logs/*
 !logs/.gitkeep
+
+# MongoDB volume
+mongo_data/

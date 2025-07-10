@@ -4,6 +4,8 @@ from utils.security import auth_and_csrf_required
 from utils.embeddings import embed_text, cosine_similarity
 import statistics, datetime, math, isodate
 from utils.youtube_api import get_youtube_client
+import re
+from extensions import limiter
 
 niche_explorer_bp = Blueprint("niche_explorer", __name__)
 
@@ -13,14 +15,21 @@ RELEVANCE_THRESHOLD = 0.25
 
 @niche_explorer_bp.route("/search", methods=["POST"])
 @auth_and_csrf_required
+@limiter.limit("5 per minute")
 def niche_search(user_data):
     data = request.get_json()
-    keyword = data.get("keyword", "").strip()
+    query = data.get("query", "").strip()
     time_frame = data.get("time_frame", "last_month")
     video_type = data.get("video_type", "longform")
 
-    if not keyword:
-        return jsonify({"error": "Missing keyword"}), 400
+    if not query:
+        return jsonify({"error": "Missing query"}), 400
+
+    if len(query) > 100:
+        return jsonify({"error": "Query too long (max 100 characters)"}), 400
+
+    if not re.match(r"^[\w\s\-.,!?':()]+$", query):
+        return jsonify({"error": "Query contains unsupported characters"}), 400
 
     timeframes = {
         "last_week": 7,
@@ -43,7 +52,7 @@ def niche_search(user_data):
     if video_type == "shorts":
         search = yt.search().list(
             part="snippet",
-            q=keyword,
+            q=query,
             type="video",
             order="viewCount",
             publishedAfter=published_after,
@@ -54,7 +63,7 @@ def niche_search(user_data):
     elif video_type == "longform":
         medium = yt.search().list(
             part="snippet",
-            q=keyword,
+            q=query,
             type="video",
             order="viewCount",
             publishedAfter=published_after,
@@ -63,7 +72,7 @@ def niche_search(user_data):
         ).execute()
         long = yt.search().list(
             part="snippet",
-            q=keyword,
+            q=query,
             type="video",
             order="viewCount",
             publishedAfter=published_after,
@@ -74,7 +83,7 @@ def niche_search(user_data):
     else:
         return jsonify({"error": "Invalid video_type"}), 400
 
-    query_vector = embed_text(keyword)
+    query_vector = embed_text(query)
 
     # Determine relevant videos initially
     video_info = []
@@ -126,7 +135,7 @@ def niche_search(user_data):
                     views = int(vid.get("statistics", {}).get("viewCount", 0))
                     dur = isodate.parse_duration(vid.get("contentDetails", {}).get("duration", "PT0S")).total_seconds()
 
-                    if not ((video_type == "shorts" and dur > 120) or (video_type == "longform" and dur <= 120)):
+                    if not ((video_type == "shorts" and dur > 180) or (video_type == "longform" and dur <= 180)):
                         channel_map[ch_id]["recentViews"].append(views)
 
                     channel_map[ch_id]["recentTitles"].append(title)
@@ -177,6 +186,6 @@ def niche_search(user_data):
     results.sort(key=lambda x: x["score"], reverse=True)
 
     current_app.logger.info(
-        f"User {user_data['email']} ran niche search '{keyword}' time_frame={time_frame} type={video_type} and fetched {len(results)} channels."
+        f"User {user_data['email']} ran niche search '{query}' time_frame={time_frame} type={video_type} and fetched {len(results)} channels."
     )
     return jsonify(results), 200

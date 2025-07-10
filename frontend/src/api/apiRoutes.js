@@ -98,10 +98,10 @@ export const fetchChannelInsights = (channelId, myChannelId) =>
     .then((res) => res.data);
 
 // NicheExplorer
-export const searchNiche = (keyword, options = {}) =>
+export const searchNiche = (query, options = {}) =>
   axios
     .post("/niche-explorer/search", {
-      keyword,
+      query,
       time_frame: options.timeFrame || "last_month",
       video_type: options.videoType || "longform",
     })

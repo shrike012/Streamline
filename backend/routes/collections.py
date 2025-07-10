@@ -2,13 +2,14 @@ from flask import Blueprint, request, jsonify, current_app
 from utils.security import auth_and_csrf_required
 from bson import ObjectId
 import uuid
+from extensions import limiter, mongo
 
 collections_bp = Blueprint("collections", __name__)
 
 @collections_bp.route("/list", methods=["GET"])
 @auth_and_csrf_required
+@limiter.limit("20 per minute")
 def get_saved_collections(data):
-    mongo = current_app.extensions["pymongo"]
     users = mongo.db.users
 
     user = users.find_one({"_id": ObjectId(data["user_id"])}, {"savedCollections": 1})
@@ -17,8 +18,8 @@ def get_saved_collections(data):
 
 @collections_bp.route("/create", methods=["POST"])
 @auth_and_csrf_required
+@limiter.limit("5 per minute")
 def create_saved_collection(data):
-    mongo = current_app.extensions["pymongo"]
     users = mongo.db.users
 
     req = request.get_json()
@@ -50,13 +51,12 @@ def create_saved_collection(data):
     if result.modified_count == 0:
         return jsonify({"error": "Failed to add collection"}), 500
 
-    current_app.logger.info(f"User {data['email']} created new collection: {formatted_name}")
     return jsonify(new_collection), 201
 
 @collections_bp.route("/<collection_id>/rename", methods=["POST"])
 @auth_and_csrf_required
+@limiter.limit("10 per minute")
 def rename_saved_collection(data, collection_id):
-    mongo = current_app.extensions["pymongo"]
     users = mongo.db.users
 
     req = request.get_json()
@@ -86,15 +86,12 @@ def rename_saved_collection(data, collection_id):
     if result.modified_count == 0:
         return jsonify({"error": "Failed to rename collection"}), 404
 
-    current_app.logger.info(
-        f"User {data['email']} renamed collection {collection_id} to {formatted_name}"
-    )
     return jsonify({"message": "Collection renamed"}), 200
 
 @collections_bp.route("/<collection_id>/videos/<video_id>", methods=["DELETE"])
 @auth_and_csrf_required
+@limiter.limit("10 per minute")
 def remove_video_from_collection(data, collection_id, video_id):
-    mongo = current_app.extensions["pymongo"]
     users = mongo.db.users
 
     result = users.update_one(
@@ -110,13 +107,12 @@ def remove_video_from_collection(data, collection_id, video_id):
     if result.modified_count == 0:
         return jsonify({"error": "Failed to remove video"}), 404
 
-    current_app.logger.info(f"User {data['email']} removed video {video_id} from collection {collection_id}")
     return jsonify({"message": "Video removed"}), 200
 
 @collections_bp.route("/<collection_id>", methods=["DELETE"])
 @auth_and_csrf_required
+@limiter.limit("15 per minute")
 def delete_saved_collection(data, collection_id):
-    mongo = current_app.extensions["pymongo"]
     users = mongo.db.users
 
     result = users.update_one(
@@ -127,13 +123,12 @@ def delete_saved_collection(data, collection_id):
     if result.modified_count == 0:
         return jsonify({"error": "Failed to delete collection"}), 404
 
-    current_app.logger.info(f"User {data['email']} deleted collection {collection_id}")
     return jsonify({"message": "Collection deleted"}), 200
 
 @collections_bp.route("/<collection_id>/videos", methods=["GET"])
 @auth_and_csrf_required
+@limiter.limit("20 per minute")
 def get_videos_in_collection(data, collection_id):
-    mongo = current_app.extensions["pymongo"]
     users = mongo.db.users
 
     user = users.find_one(
@@ -148,8 +143,8 @@ def get_videos_in_collection(data, collection_id):
 
 @collections_bp.route("/<collection_id>/videos", methods=["POST"])
 @auth_and_csrf_required
+@limiter.limit("20 per minute")
 def add_video_to_collection(data, collection_id):
-    mongo = current_app.extensions["pymongo"]
     users = mongo.db.users
 
     req = request.get_json()
@@ -178,6 +173,9 @@ def add_video_to_collection(data, collection_id):
     if any(v["videoId"] == video_id for v in collection.get("videos", [])):
         return jsonify({"error": "Video already exists in this collection"}), 400
 
+    if len(collection.get("videos", [])) >= 1000:
+        return jsonify({"error": "Collection has reached the video limit"}), 400
+
     video_doc = {
         "title": video["title"],
         "thumbnail": video["thumbnail"],
@@ -197,5 +195,4 @@ def add_video_to_collection(data, collection_id):
     if result.modified_count == 0:
         return jsonify({"error": "Failed to add video"}), 500
 
-    current_app.logger.info(f"User {data['email']} added video {video['videoId']} to collection {collection_id}")
     return jsonify({"message": "Video added"}), 200

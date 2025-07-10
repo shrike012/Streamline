@@ -10,11 +10,8 @@ import {
 } from "../api/apiRoutes.js";
 import Grid from "../components/Grid.jsx";
 import VideoCard from "../components/VideoCard.jsx";
-import { useChannel } from "../context/ChannelContext.jsx";
 
 function Collections() {
-  const { selectedChannel } = useChannel();
-
   const [collections, setCollections] = useState([]);
   const [selectedCollectionId, setSelectedCollectionId] = useState(null);
   const [savedVideos, setSavedVideos] = useState([]);
@@ -119,114 +116,95 @@ function Collections() {
       <Helmet>
         <title>Saved Videos</title>
       </Helmet>
-
-      <h1>Your Saved Videos</h1>
-
-      {!selectedChannel ? (
-        <div
-          style={{
-            textAlign: "center",
-            padding: "4rem 1rem",
-            color: "#888",
-          }}
-        >
-          Please add a channel before using Saved Videos.
-        </div>
-      ) : (
-        <>
-          <div className="input-group-row">
-            {collections.map((col) => (
-              <button
-                key={col.collectionId}
-                className={
-                  selectedCollectionId === col.collectionId
-                    ? "button-primary-sm"
-                    : "button-ghost-sm"
-                }
-                onClick={() => handleSelectCollection(col.collectionId)}
-              >
-                {col.name}
-              </button>
-            ))}
+      <h1>Saved Videos</h1>
+      <div className="input-group-row">
+        {collections.map((col) => (
+          <button
+            key={col.collectionId}
+            className={
+              selectedCollectionId === col.collectionId
+                ? "button-primary-sm"
+                : "button-ghost-sm"
+            }
+            onClick={() => handleSelectCollection(col.collectionId)}
+          >
+            {col.name}
+          </button>
+        ))}
+        <button className="button-ghost-sm" onClick={handleCreateCollection}>
+          ＋ Add Collection
+        </button>
+        <div style={{ width: "0.5rem" }} />
+        {selectedCollectionId && (
+          <>
             <button
               className="button-ghost-sm"
-              onClick={handleCreateCollection}
+              onClick={handleRenameCollection}
             >
-              ＋ Add Collection
+              ✎ Rename Collection
             </button>
-            <div style={{ width: "0.5rem" }} />
-            {selectedCollectionId && (
-              <>
-                <button
-                  className="button-ghost-sm"
-                  onClick={handleRenameCollection}
-                >
-                  ✎ Rename Collection
-                </button>
-                <button
-                  className="button-ghost-sm"
-                  onClick={handleDeleteCollection}
-                >
-                  🗑 Delete Collection
-                </button>
-              </>
-            )}
-          </div>
+            <button
+              className="button-ghost-sm"
+              onClick={handleDeleteCollection}
+            >
+              🗑 Delete Collection
+            </button>
+          </>
+        )}
+      </div>
 
-          <section className="page-section">
-            {collections.length === 0 ? (
-              <div
-                style={{
-                  color: "#888",
-                  padding: "4rem 1rem",
-                  textAlign: "center",
-                }}
-              >
-                No collections created yet.
-              </div>
-            ) : !selectedCollectionId ? (
-              <div
-                style={{
-                  color: "#888",
-                  padding: "4rem 1rem",
-                  textAlign: "center",
-                }}
-              >
-                No collection selected.
-              </div>
-            ) : savedVideos.length === 0 ? (
-              <div
-                style={{
-                  color: "#888",
-                  padding: "4rem 1rem",
-                  textAlign: "center",
-                }}
-              >
-                This collection has no saved videos.
-              </div>
-            ) : (
-              <Grid
-                items={savedVideos}
-                renderCard={(video, idx) => (
-                  <VideoCard
-                    key={video.videoId || idx}
-                    title={video.title}
-                    thumbnail={video.thumbnail}
-                    views={video.viewCount}
-                    publishedAt={video.publishedAt}
-                    length={video.length}
-                    videoId={video.videoId}
-                    channelTitle={video.channelTitle}
-                    showChannelTitle={true}
-                    channelId={video.channelId}
-                    onRemove={() => handleRemoveVideo(video.videoId)}
-                  />
-                )}
+      <section className="page-section">
+        {collections.length === 0 ? (
+          <div
+            style={{
+              color: "#888",
+              padding: "4rem 1rem",
+              textAlign: "center",
+            }}
+          >
+            No collections created yet.
+          </div>
+        ) : !selectedCollectionId ? (
+          <div
+            style={{
+              color: "#888",
+              padding: "4rem 1rem",
+              textAlign: "center",
+            }}
+          >
+            No collection selected.
+          </div>
+        ) : savedVideos.length === 0 ? (
+          <div
+            style={{
+              color: "#888",
+              padding: "4rem 1rem",
+              textAlign: "center",
+            }}
+          >
+            This collection has no saved videos.
+          </div>
+        ) : (
+          <Grid
+            items={savedVideos}
+            renderCard={(video, idx) => (
+              <VideoCard
+                key={video.videoId || idx}
+                title={video.title}
+                thumbnail={video.thumbnail}
+                views={video.viewCount}
+                publishedAt={video.publishedAt}
+                length={video.length}
+                videoId={video.videoId}
+                channelTitle={video.channelTitle}
+                showChannelTitle={true}
+                channelId={video.channelId}
+                onRemove={() => handleRemoveVideo(video.videoId)}
               />
             )}
-          </section>
-        </>
-      )}
+          />
+        )}
+      </section>
     </>
   );
 }

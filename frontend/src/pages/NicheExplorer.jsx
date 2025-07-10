@@ -1,35 +1,45 @@
 import React, { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Helmet } from "react-helmet-async";
 import { searchNiche } from "../api/apiRoutes";
 import ChannelCard from "../components/ChannelCard";
 import Grid from "../components/Grid";
 import Filters from "../components/Filters";
 import useLoadingDots from "../utils/useLoadingDots";
-import { useChannel } from "../context/ChannelContext";
 
 function NicheExplorer() {
-  const { selectedChannel } = useChannel();
-  const [timeFrame, setTimeFrame] = useState("last_month");
-  const [videoType, setVideoType] = useState("longform");
-  const [query, setQuery] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const initialQuery = searchParams.get("query") || "";
+  const initialVideoType = searchParams.get("videoType") || "longform";
+  const initialTimeFrame = searchParams.get("timeFrame") || "last_month";
+
+  const [query, setQuery] = useState(initialQuery);
+  const [videoType, setVideoType] = useState(initialVideoType);
+  const [timeFrame, setTimeFrame] = useState(initialTimeFrame);
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const loadingText = useLoadingDots("Searching", 500);
   const [error, setError] = useState(null);
+  const [searchAttempted, setSearchAttempted] = useState(false);
 
-  const handleSearch = async (e) => {
-    e.preventDefault();
-    if (!query.trim()) return;
-
+  const runSearch = async (q, tf, vt) => {
+    if (!q.trim()) return;
+    setSearchAttempted(true);
     setLoading(true);
     setError(null);
     setResults([]);
 
     try {
-      const data = await searchNiche(query, { timeFrame, videoType });
-
+      const data = await searchNiche(q.trim(), {
+        timeFrame: tf,
+        videoType: vt,
+      });
       setResults(data);
-      sessionStorage.setItem("streamline_niche_query", query);
+
+      sessionStorage.setItem("streamline_niche_query", q.trim());
+      sessionStorage.setItem("streamline_niche_video_type", vt);
+      sessionStorage.setItem("streamline_niche_time_frame", tf);
       sessionStorage.setItem("streamline_niche_results", JSON.stringify(data));
     } catch (err) {
       setError("Search failed. Please try again.");
@@ -38,23 +48,50 @@ function NicheExplorer() {
     }
   };
 
-  useEffect(() => {
-    const savedQuery = sessionStorage.getItem("streamline_niche_query");
-    const savedResults = sessionStorage.getItem("streamline_niche_results");
+  const handleSearch = async (e) => {
+    e.preventDefault();
+    if (!query.trim()) return;
 
-    if (savedQuery && savedResults) {
-      setQuery(savedQuery);
-      setResults(JSON.parse(savedResults));
+    setSearchParams({
+      query: query.trim(),
+      timeFrame,
+      videoType,
+    });
+
+    runSearch(query, timeFrame, videoType);
+  };
+
+  useEffect(() => {
+    const cachedQuery = sessionStorage.getItem("streamline_niche_query");
+    const cachedResults = sessionStorage.getItem("streamline_niche_results");
+    const cachedVideoType = sessionStorage.getItem(
+      "streamline_niche_video_type",
+    );
+    const cachedTimeFrame = sessionStorage.getItem(
+      "streamline_niche_time_frame",
+    );
+
+    if (cachedQuery && cachedResults) {
+      setQuery(cachedQuery);
+      setVideoType(cachedVideoType || "longform");
+      setTimeFrame(cachedTimeFrame || "last_month");
+      setResults(JSON.parse(cachedResults));
+      setSearchAttempted(true);
+
+      setSearchParams({
+        query: cachedQuery,
+        videoType: cachedVideoType || "longform",
+        timeFrame: cachedTimeFrame || "last_month",
+      });
     }
   }, []);
 
   useEffect(() => {
-    setQuery("");
-    setResults([]);
-    setError(null);
-    sessionStorage.removeItem("streamline_niche_query");
-    sessionStorage.removeItem("streamline_niche_results");
-  }, [selectedChannel]);
+    // Keep filters and input synced to URL
+    setQuery(initialQuery);
+    setVideoType(initialVideoType);
+    setTimeFrame(initialTimeFrame);
+  }, [initialQuery, initialTimeFrame, initialVideoType]);
 
   return (
     <>
@@ -106,7 +143,9 @@ function NicheExplorer() {
       <Grid
         items={results}
         emptyMessage={
-          query.trim() !== "" && !loading ? "No channels found." : null
+          searchAttempted && !loading && results.length === 0
+            ? "No channels found."
+            : null
         }
         renderCard={(channel, idx) => (
           <ChannelCard

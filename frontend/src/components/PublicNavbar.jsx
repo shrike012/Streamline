@@ -1,3 +1,5 @@
+// PublicNavbar.jsx
+
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
@@ -11,6 +13,7 @@ import Modal from "./Modal.jsx";
 import { useAuth } from "../context/AuthContext.jsx";
 import "../styles/navbar.css";
 
+// --- UI Subcomponents ---
 const Divider = () => (
   <div
     style={{
@@ -30,7 +33,7 @@ const GoogleAuthButton = ({ onClick, disabled }) => (
   <button
     onClick={onClick}
     disabled={disabled}
-    className={"button-secondary"}
+    className="button-secondary"
     style={{ width: "100%" }}
   >
     Continue with Google
@@ -53,11 +56,13 @@ const PromptLink = ({ question, linkText, onClick }) => (
   </p>
 );
 
+// --- OAuth Config ---
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 const REDIRECT_URI = import.meta.env.VITE_GOOGLE_REDIRECT_URI;
 const SCOPE =
   "https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile openid";
 
+// --- Main Component ---
 export default function PublicNavbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
@@ -80,16 +85,10 @@ export default function PublicNavbar() {
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const token = params.get("token");
-    const hasGoogleCode = params.get("code");
+    const code = params.get("code");
 
-    getMe()
-      .then((res) => {
-        setUser(res.data);
-        navigate("/app/dashboard");
-      })
-      .catch(() => {});
-
-    if (hasGoogleCode) {
+    // OAuth redirect flow
+    if (code) {
       window.history.replaceState({}, document.title, window.location.pathname);
     }
 
@@ -98,12 +97,25 @@ export default function PublicNavbar() {
       setShowResetModal(true);
       window.history.replaceState({}, document.title, window.location.pathname);
     }
+
+    // If user is already authenticated
+    const accessToken = localStorage.getItem("accessToken");
+    if (!accessToken) return;
+
+    getMe()
+      .then((res) => {
+        setUser(res.data);
+        const next =
+          params.get("next") || localStorage.getItem("google_redirect_next");
+        localStorage.removeItem("google_redirect_next");
+        navigate(next || "/app/dashboard");
+      })
+      .catch(() => {});
   }, [location, navigate, setUser]);
 
   useEffect(() => {
     const handleOpenSignup = () => setShowSignup(true);
     window.addEventListener("open-signup", handleOpenSignup);
-
     return () => window.removeEventListener("open-signup", handleOpenSignup);
   }, []);
 
@@ -134,7 +146,7 @@ export default function PublicNavbar() {
     try {
       await requestPasswordReset(forgotEmail);
       setForgotMessage(
-        "If your account supports password login, a reset link has been sent to your email.",
+        "If your account supports password login, a reset link has been sent.",
       );
     } catch {
       setForgotMessage("Something went wrong. Try again.");
@@ -167,7 +179,13 @@ export default function PublicNavbar() {
       await login(form);
       const me = await getMe();
       setUser(me.data);
-      navigate("/app/dashboard");
+
+      const params = new URLSearchParams(location.search);
+      const next =
+        params.get("next") || localStorage.getItem("google_redirect_next");
+      localStorage.removeItem("google_redirect_next");
+
+      navigate(next || "/app/dashboard");
     } catch {
       setErrors({ form: "Invalid credentials." });
     } finally {
@@ -184,7 +202,13 @@ export default function PublicNavbar() {
       await signup(form);
       const me = await getMe();
       setUser(me.data);
-      navigate("/app/dashboard");
+
+      const params = new URLSearchParams(location.search);
+      const next =
+        params.get("next") || localStorage.getItem("google_redirect_next");
+      localStorage.removeItem("google_redirect_next");
+
+      navigate(next || "/app/dashboard");
     } catch {
       setErrors({ form: "Signup failed." });
     } finally {
@@ -193,18 +217,22 @@ export default function PublicNavbar() {
   };
 
   const handleGoogleRedirect = () => {
+    const params = new URLSearchParams(location.search);
+    const next = params.get("next");
+    if (next) localStorage.setItem("google_redirect_next", next);
+
     window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${REDIRECT_URI}&response_type=code&scope=${SCOPE}&access_type=offline&prompt=consent`;
   };
 
   return (
     <>
+      {/* Main Navbar */}
       <header className="navbar public-navbar">
         <div className="navbar-content">
           <a href="/" className="navbar-logo">
             <img src="/logo.ico" alt="logo" className="logo-img" />
             <span className="logo-text">Streamline</span>
           </a>
-
           <div className="navbar-section">
             <nav className="navbar-links">
               <span className="nav-link" onClick={() => setShowLogin(true)}>
@@ -217,7 +245,6 @@ export default function PublicNavbar() {
                 Create an account
               </button>
             </nav>
-
             <button
               className="menu-toggle"
               onClick={() => setMenuOpen(!menuOpen)}
@@ -228,6 +255,7 @@ export default function PublicNavbar() {
         </div>
       </header>
 
+      {/* Mobile Menu */}
       {menuOpen && (
         <div
           className="mobile-menu-overlay"
@@ -239,7 +267,7 @@ export default function PublicNavbar() {
             bottom: 0,
             backgroundColor: "rgba(0, 0, 0, 0.85)",
             backdropFilter: "blur(6px)",
-            WebkitBackdropFilter: "blur(6px)", // for Safari support
+            WebkitBackdropFilter: "blur(6px)",
             zIndex: 999,
             display: "flex",
             flexDirection: "column",
@@ -253,7 +281,7 @@ export default function PublicNavbar() {
               setMenuOpen(false);
               setShowLogin(true);
             }}
-            className={"button-secondary"}
+            className="button-secondary"
           >
             Log in
           </button>
@@ -262,13 +290,14 @@ export default function PublicNavbar() {
               setMenuOpen(false);
               setShowSignup(true);
             }}
-            className={"button-primary"}
+            className="button-primary"
           >
             Create an account
           </button>
         </div>
       )}
 
+      {/* Login Modal */}
       <Modal
         isOpen={showLogin}
         onClose={closeModals}
@@ -310,6 +339,7 @@ export default function PublicNavbar() {
         }
       />
 
+      {/* Signup Modal */}
       <Modal
         isOpen={showSignup}
         onClose={closeModals}
@@ -343,6 +373,7 @@ export default function PublicNavbar() {
         }
       />
 
+      {/* Forgot Password Modal */}
       <Modal
         isOpen={showForgotPassword}
         onClose={() => {
@@ -360,6 +391,7 @@ export default function PublicNavbar() {
         submitLabel="Send Reset Link"
       />
 
+      {/* Reset Token Modal */}
       <Modal
         isOpen={showResetModal}
         onClose={() => {

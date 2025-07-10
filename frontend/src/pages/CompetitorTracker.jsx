@@ -339,7 +339,7 @@ function CompetitorTracker() {
         <div
           style={{ textAlign: "center", padding: "4rem 1rem", color: "#888" }}
         >
-          Please add a channel before using the Competitor Tracker.
+          Add a channel to use the Competitor Tracker.
         </div>
       ) : (
         <>

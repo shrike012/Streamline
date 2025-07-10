@@ -61,9 +61,7 @@ function VideoCard({
       setCollections(res || []);
       setSaveError(null);
       setShowModal(true);
-    } catch (err) {
-      console.error("Failed to fetch collections:", err);
-    }
+    } catch (err) {}
   };
 
   const handleModalClose = () => {
@@ -91,10 +89,9 @@ function VideoCard({
       await addVideoToCollection(collectionId, videoData);
       setShowModal(false);
     } catch (err) {
-      console.error("Failed to add video to collection:", err);
       const message =
         err.response?.data?.error || "Failed to add video to collection.";
-      setSaveError(message); // display error inline
+      setSaveError(message);
     }
   };
 
@@ -111,7 +108,9 @@ function VideoCard({
         await handleAddToCollection(created.collectionId);
       }
     } catch (err) {
-      console.error("Failed to create collection:", err);
+      const message =
+        err.response?.data?.error || "Failed to create collection.";
+      setSaveError(message);
     }
   };
 

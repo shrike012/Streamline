@@ -3,15 +3,15 @@ from bson import ObjectId
 from datetime import datetime, timezone, timedelta
 from utils.youtube_api import get_youtube_client, fetch_channel_videos
 from utils.parser import extract_main_topic, chunkify
-import statistics, isodate
+import statistics, isodate, json
 from dateutil import parser as date_parser
+from utils.db import set_redis_cache
+from extensions import mongo
 
 def find_outliers_for_channel(user_id: str, user_email: str, user_channel: dict):
-    mongo = current_app.extensions["pymongo"]
-    outliers = mongo.db.outliers
     yt = get_youtube_client()
-
     channel_id = user_channel.get("channelId")
+    redis_key = f"outliers:{str(user_id)}:{channel_id}"
 
     user_doc = mongo.db.users.find_one({"_id": ObjectId(user_id)})
     user_channel_ids = [ch["channelId"] for ch in user_doc.get("channels", [])]
@@ -19,7 +19,6 @@ def find_outliers_for_channel(user_id: str, user_email: str, user_channel: dict)
     search_term = []
     if user_channel.get("analyzedNiche", "").strip():
         search_term.append(user_channel["analyzedNiche"].strip())
-    if user_channel.get("analyzedNiche", "").strip():
         main_topic = extract_main_topic(user_channel["analyzedNiche"].strip())
         if main_topic:
             search_term.append(main_topic)
@@ -34,10 +33,7 @@ def find_outliers_for_channel(user_id: str, user_email: str, user_channel: dict)
                 q=kw, type="video", part="snippet", maxResults=50,
                 videoDuration="medium", publishedAfter=published_after, order="viewCount",
             ).execute()
-
-            videos = res.get("items", [])
-
-            search_results.extend(videos)
+            search_results.extend(res.get("items", []))
         except Exception as e:
             current_app.logger.error(f"[{user_email}] Search failed for '{kw}': {e}")
 
@@ -62,8 +58,8 @@ def find_outliers_for_channel(user_id: str, user_email: str, user_channel: dict)
             total_seconds = int(duration.total_seconds())
             mins, secs = divmod(total_seconds, 60)
             hrs, mins = divmod(mins, 60)
-
             length_str = f"{hrs}:{mins:02}:{secs:02}" if hrs > 0 else f"{mins}:{secs:02}"
+
             detailed_videos.append({
                 "videoId": item["id"],
                 "title": snippet["title"],
@@ -106,7 +102,7 @@ def find_outliers_for_channel(user_id: str, user_email: str, user_channel: dict)
 
             if outlierScore >= 2.0 and vid["viewCount"] >= 5000:
                 outlier_doc = {
-                    "userId": ObjectId(user_id),
+                    "userId": str(user_id),
                     "videoId": vid["videoId"],
                     "channelId": vid["channelId"],
                     "title": vid["title"],
@@ -114,7 +110,8 @@ def find_outliers_for_channel(user_id: str, user_email: str, user_channel: dict)
                     "outlierScore": round(outlierScore, 2),
                     "views": vid["viewCount"],
                     "publishedAt": vid["publishedAt"],
-                    "createdAt": datetime.now(timezone.utc),
+                    "createdAt": datetime.now(timezone.utc).isoformat(),
+                    "length": vid["length"]
                 }
                 found_outliers.append(outlier_doc)
 
@@ -123,15 +120,10 @@ def find_outliers_for_channel(user_id: str, user_email: str, user_channel: dict)
                 f"[{user_email}] Error analyzing candidate channel {candidate_channel_id}: {e}"
             )
 
-    outliers.delete_many({"userId": ObjectId(user_id), "channelId": channel_id})
-    outliers.update_one(
-        {"userId": ObjectId(user_id), "channelId": channel_id},
-        {"$set": {"outliers": found_outliers, "updatedAt": datetime.now(timezone.utc)}},
-        upsert=True
-    )
+    redis = current_app.extensions["redis"]
+    set_redis_cache(redis, redis_key, found_outliers, ttl_seconds=86400)
 
 def refresh_all_outliers_for_all_users():
-    mongo = current_app.extensions["pymongo"]
     users = mongo.db.users.find({})
     for user in users:
         user_id = str(user["_id"])
@@ -145,9 +137,11 @@ def refresh_all_outliers_for_all_users():
                     f"Error refreshing outliers for user {email} channel {user_channel.get('channelId')}: {e}"
                 )
 
+MAX_NOTIFICATIONS = 20  # per user-channel in Redis
+
 def check_competitors_for_all_users():
-    mongo = current_app.extensions["pymongo"]
     yt = get_youtube_client()
+    redis = current_app.extensions["redis"]
 
     users = list(mongo.db.users.find({}))
 
@@ -190,24 +184,20 @@ def check_competitors_for_all_users():
                         if latest_video:
                             published_at = date_parser.parse(latest_video["publishedAt"]).astimezone(timezone.utc)
                             if published_at > uploads_since:
+                                # Redis key format: notifs:<user_id>:<channel_id>
+                                redis_key = f"notifs:{str(user_id)}:{comp_channel_id}"
+                                timestamp = datetime.now(timezone.utc).isoformat()
 
-                                # Insert new notification
-                                mongo.db.notifications.insert_one({
-                                    "userId": user_id,
-                                    "channelId": comp_channel_id,
+                                notif_data = {
                                     "message": f"New video from {comp.get('title', 'a competitor')}: {latest_video['title']}",
-                                    "timestamp": datetime.now(timezone.utc),
+                                    "timestamp": timestamp,
+                                    "channelId": comp_channel_id,
                                     "read": False,
-                                })
+                                }
 
-                                # Prune excess notifications: keep only latest 20 for each user-channel
-                                excess_notifications = mongo.db.notifications.find(
-                                    {"userId": user_id, "channelId": comp_channel_id}
-                                ).sort("timestamp", -1).skip(20)
-
-                                excess_ids = [n["_id"] for n in excess_notifications]
-                                if excess_ids:
-                                    mongo.db.notifications.delete_many({"_id": {"$in": excess_ids}})
+                                # Add to Redis and trim to latest N
+                                redis.lpush(redis_key, json.dumps(notif_data))
+                                redis.ltrim(redis_key, 0, MAX_NOTIFICATIONS - 1)
 
                                 # Update competitor last checked timestamp
                                 mongo.db.competitors.update_one(

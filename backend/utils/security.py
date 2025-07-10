@@ -1,19 +1,30 @@
 from flask import request, jsonify, current_app
 from functools import wraps
-import jwt
-import secrets
+import jwt, re, secrets
 from datetime import datetime, timedelta, timezone
 
-def generate_token(email, user_id):
-    return jwt.encode(
+def generate_tokens(email, user_id):
+    access_token = jwt.encode(
         {
             "email": email,
             "user_id": str(user_id),
-            "exp": datetime.now(timezone.utc) + timedelta(hours=24)
+            "exp": datetime.now(timezone.utc) + timedelta(minutes=15),
         },
         current_app.config["JWT_KEY"],
-        algorithm="HS256"
+        algorithm="HS256",
     )
+
+    refresh_token = jwt.encode(
+        {
+            "email": email,
+            "user_id": str(user_id),
+            "exp": datetime.now(timezone.utc) + timedelta(days=30),
+        },
+        current_app.config["JWT_REFRESH_KEY"],
+        algorithm="HS256",
+    )
+
+    return access_token, refresh_token
 
 def generate_csrf_token():
     return secrets.token_urlsafe(32)
@@ -29,6 +40,8 @@ def _verify_token():
         return None, {"error": "Token expired"}, 401
     except jwt.InvalidTokenError:
         return None, {"error": "Invalid token"}, 401
+    except Exception:
+        return None, {"error": "Token verification failed"}, 401
 
 def token_required(f):
     @wraps(f)
@@ -53,3 +66,12 @@ def auth_and_csrf_required(f):
 
         return f(data, *args, **kwargs)
     return decorated
+
+def is_strong_password(password):
+    return (
+        len(password) >= 8 and
+        re.search(r"[A-Z]", password) and
+        re.search(r"[a-z]", password) and
+        re.search(r"\d", password) and
+        re.search(r"[!@#$%^&*(),.?\":{}|<>]", password)
+    )

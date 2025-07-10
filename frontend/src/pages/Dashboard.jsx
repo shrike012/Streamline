@@ -4,6 +4,7 @@ import { useChannel } from "../context/ChannelContext";
 import VideoCard from "../components/VideoCard";
 import InfoCard from "../components/InfoCard";
 import Grid from "../components/Grid.jsx";
+import Carousel from "../components/Carousel.jsx";
 import { fetchOutliers, fetchChannelStats } from "../api/apiRoutes.js";
 import useLoadingDots from "../utils/useLoadingDots";
 
@@ -11,7 +12,7 @@ function Dashboard() {
   const { selectedChannel } = useChannel();
 
   const [videos, setVideos] = useState([]);
-  const [outlierVideos, setOutlierVideos] = useState([]);
+  const [outlierVideos, setOutlierVideos] = useState(null);
   const [channelStats, setChannelStats] = useState(null);
   const [error, setError] = useState(null);
 
@@ -29,8 +30,14 @@ function Dashboard() {
           fetchChannelStats(selectedChannel.channelId),
         ]);
 
-        setVideos((statsData.recentVideos || []).slice(0, 4));
-        setOutlierVideos((outliersData || []).slice(0, 4));
+        setVideos(statsData.recentVideos || []);
+        if (Array.isArray(outliersData)) {
+          setOutlierVideos(outliersData);
+        } else if (outliersData?.status === "pending") {
+          setOutlierVideos("pending");
+        } else {
+          setOutlierVideos([]);
+        }
         setChannelStats(statsData);
         setError(null);
       } catch (err) {
@@ -40,6 +47,29 @@ function Dashboard() {
     };
 
     fetchDashboardData();
+
+    // Start polling after initial fetch
+    let pollAttempts = 0;
+    const MAX_POLL_ATTEMPTS = 12;
+    const POLL_INTERVAL_MS = 10000;
+
+    const intervalId = setInterval(async () => {
+      pollAttempts++;
+      try {
+        const updatedOutliers = await fetchOutliers(selectedChannel.channelId);
+        if (Array.isArray(updatedOutliers) && updatedOutliers.length > 0) {
+          setOutlierVideos(updatedOutliers);
+          clearInterval(intervalId);
+        }
+      } catch (err) {
+        console.warn("Polling failed:", err);
+      }
+      if (pollAttempts >= MAX_POLL_ATTEMPTS) {
+        clearInterval(intervalId);
+      }
+    }, POLL_INTERVAL_MS);
+
+    return () => clearInterval(intervalId); // Cleanup on unmount
   }, [selectedChannel]);
 
   return (
@@ -58,7 +88,11 @@ function Dashboard() {
       {/* Performance Overview */}
       <section className="page-section">
         <h2 className="section-title">Performance Overview</h2>
-        {selectedChannel && !channelStats ? (
+        {!selectedChannel ? (
+          <div style={{ padding: "1rem", color: "#888" }}>
+            Add a channel to see insights.
+          </div>
+        ) : !channelStats ? (
           <div style={{ padding: "1rem", color: "#888" }}>
             {loadingOverview}
           </div>
@@ -92,11 +126,15 @@ function Dashboard() {
       {/* Recently Uploaded */}
       <section className="page-section">
         <h2 className="section-title">Recently Uploaded</h2>
-        {videos.length === 0 ? (
+        {!selectedChannel ? (
+          <div style={{ padding: "1rem", color: "#888" }}>
+            Add a channel to see recent uploads.
+          </div>
+        ) : videos.length === 0 ? (
           <div style={{ padding: "1rem", color: "#888" }}>{loadingVideos}</div>
         ) : (
-          <Grid
-            items={videos}
+          <Carousel
+            items={Array.isArray(videos) ? videos : []}
             renderCard={(video, idx) => (
               <VideoCard
                 key={`video-${idx}`}
@@ -119,13 +157,19 @@ function Dashboard() {
       {/* Relevant Outliers */}
       <section className="page-section">
         <h2 className="section-title">Relevant Outliers</h2>
-        {outlierVideos.length === 0 ? (
+        {!selectedChannel ? (
+          <div style={{ padding: "1rem", color: "#888" }}>
+            Add a channel to see outliers.
+          </div>
+        ) : outlierVideos === "pending" || outlierVideos?.length === 0 ? (
           <div style={{ padding: "1rem", color: "#888" }}>
             {loadingOutliers}
           </div>
         ) : (
-          <Grid
-            items={outlierVideos}
+          <Carousel
+            items={
+              Array.isArray(outlierVideos) ? outlierVideos.slice(0, 10) : []
+            }
             renderCard={(video, idx) => (
               <VideoCard
                 key={`outlier-${idx}`}

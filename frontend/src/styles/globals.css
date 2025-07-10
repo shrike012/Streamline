@@ -155,20 +155,6 @@ body {
 }
 
 /* Typography */
-.heading {
-  font-size: 3rem;
-  font-weight: 700;
-  line-height: 1.2;
-  margin-bottom: 1.5rem;
-}
-
-.text-secondary {
-  font-size: 1.25rem;
-  color: #888;
-  max-width: 700px;
-  margin: 0 auto 2rem;
-}
-
 .section-title {
   font-size: 1.25rem;
   font-weight: 600;

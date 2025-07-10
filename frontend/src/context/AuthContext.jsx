@@ -35,12 +35,12 @@ export const AuthProvider = ({ children }) => {
     checkAuth();
   }, []);
 
+  if (loading) return null;
+
   const logoutUser = async () => {
     try {
       await logoutRequest(); // Clears the cookie on the backend
-    } catch (err) {
-      console.error("Logout failed:", err);
-    }
+    } catch (err) {}
     setUser(null);
     Object.keys(localStorage).forEach((key) => {
       if (key.startsWith("streamline_")) {

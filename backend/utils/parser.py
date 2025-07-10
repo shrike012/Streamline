@@ -28,7 +28,6 @@ def parse_channel_metadata(chan_info):
 def parse_motives(motive_str):
     """
     Given a motive string from the AI output, return a list of main motives matched.
-    Example input: '[education, connection]' or '["education", "connection"]'
     """
     main_motives = [
         "entertainment",
@@ -60,7 +59,6 @@ def extract_main_topic(niche_str):
     Extract main topic from niche string.
     Example:
       "Valorant gaming" -> "valorant"
-      "CS2 frag movies"  -> "cs2"
       "Minecraft building tutorials" -> "minecraft"
     """
     tokens = niche_str.lower().split()

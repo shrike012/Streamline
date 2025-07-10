@@ -1,6 +1,8 @@
 from flask import Blueprint, request, jsonify, current_app
 from utils.security import auth_and_csrf_required
 from bson import ObjectId
+from extensions import limiter, mongo
+import json
 
 outliers_bp = Blueprint("outliers", __name__)
 
@@ -16,37 +18,34 @@ def convert_objectids(doc):
 
 @outliers_bp.route("/list", methods=["GET"])
 @auth_and_csrf_required
+@limiter.limit("60 per minute")
 def list_outliers(data):
     try:
-        mongo = current_app.extensions["pymongo"]
-        outliers = mongo.db.outliers
-        user_id = ObjectId(data["user_id"])
-
-        # Get the channelId from query param
-        selected_channel_id = request.args.get("channelId")
-        if not selected_channel_id:
+        user_id = str(data["user_id"])
+        channel_id = request.args.get("channelId")
+        if not channel_id:
             return jsonify({"error": "Missing channelId in query"}), 400
 
-        # Fetch user's own channels to exclude own uploads
-        user = mongo.db.users.find_one({"_id": user_id})
-        user_channel_ids = [ch["channelId"] for ch in user.get("channels", [])]
+        user_doc = mongo.db.users.find_one({"_id": ObjectId(user_id)})
+        own_channel_ids = [ch["channelId"] for ch in user_doc.get("channels", [])]
 
-        # Fetch outlier docs only for this channel
-        docs = list(outliers.find({
-            "userId": user_id,
-            "channelId": selected_channel_id
-        }))
+        if channel_id not in own_channel_ids:
+            return jsonify({"error": "You don't have access to this channel"}), 403
 
-        combined_outliers = []
-        for doc in docs:
-            for outlier in doc.get("outliers", []):
-                video_channel_id = outlier.get("videoChannelId")
-                if video_channel_id in user_channel_ids:
-                    continue  # skip own uploads
-                combined_outliers.append(outlier)
+        redis = current_app.extensions["redis"]
+        redis_key = f"outliers:{user_id}:{channel_id}"
+        raw = redis.get(redis_key)
 
-        return jsonify(convert_objectids(combined_outliers))
+        if raw is None:
+            return jsonify({"status": "pending"}), 200
+
+        outliers = json.loads(raw)
+
+        # Filter out user's own uploads just in case
+        filtered = [o for o in outliers if o.get("channelId") not in own_channel_ids]
+
+        return jsonify(filtered), 200
 
     except Exception as e:
-        current_app.logger.error(f"Failed to fetch outliers for user {data['email']}: {str(e)}")
+        current_app.logger.error(f"Failed to fetch outliers for user {user_doc.get('email', 'unknown')}: {str(e)}")
         return jsonify({"error": "Internal server error"}), 500

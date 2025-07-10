@@ -10,6 +10,11 @@
   cursor: default;
   user-select: text;
   word-break: break-word;
+  width: 250px;
+  height: 100px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .info-card:hover {
