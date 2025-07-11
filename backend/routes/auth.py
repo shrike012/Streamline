@@ -26,9 +26,9 @@ def obfuscate_email(email: str) -> str:
     return email[:2] + "***" + email[-3:] if len(email) >= 6 else "***"
 
 def set_auth_cookies(resp, access_token, refresh_token, csrf_token):
-    resp.set_cookie("token", access_token, httponly=True, secure=True, samesite="None", max_age=900, path="/")
+    resp.set_cookie("token", access_token, httponly=True, secure=True, samesite="None", max_age=7200, path="/")
     resp.set_cookie("refresh_token", refresh_token, httponly=True, secure=True, samesite="None", max_age=2592000, path="/")
-    resp.set_cookie("csrf_token", csrf_token, httponly=False, secure=True, samesite="None", max_age=900, path="/")
+    resp.set_cookie("csrf_token", csrf_token, httponly=False, secure=True, samesite="None", max_age=7200, path="/")
     return resp
 
 @auth_bp.route("/signup", methods=["POST"])
@@ -99,7 +99,7 @@ def refresh_token():
             {
                 "email": data["email"],
                 "user_id": str(data["user_id"]),
-                "exp": datetime.now(timezone.utc) + timedelta(minutes=15),
+                "exp": datetime.now(timezone.utc) + timedelta(hours=2)
             },
             current_app.config["JWT_KEY"],
             algorithm="HS256"

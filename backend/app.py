@@ -1,6 +1,5 @@
 from flask import Flask, request, current_app, jsonify
 from flask_limiter.errors import RateLimitExceeded
-from flask_cors import CORS
 from werkzeug.middleware.proxy_fix import ProxyFix
 from redis import Redis
 from dotenv import load_dotenv
@@ -38,14 +37,6 @@ limiter.init_app(app)
 
 # Proxy support (for Railway)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1)
-
-# Cookie and request limits
-app.config.update(
-    SESSION_COOKIE_SECURE=True,
-    SESSION_COOKIE_HTTPONLY=True,
-    SESSION_COOKIE_SAMESITE="Lax",
-    MAX_CONTENT_LENGTH=2 * 1024 * 1024,
-)
 
 # App-wide configs
 app.config.update(

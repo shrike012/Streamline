@@ -1,6 +1,8 @@
 from flask import Blueprint, request, jsonify, make_response, current_app
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
+
+from routes.auth import set_auth_cookies
 from utils.security import (
     token_required,
     auth_and_csrf_required,
@@ -64,10 +66,8 @@ def update_email(data):
     csrf_token = generate_csrf_token()
 
     resp = make_response(jsonify({"message": "Email updated"}))
-    resp.set_cookie("token", access_token, httponly=True, secure=secure_cookie(), samesite="Lax", max_age=900, path="/")
-    resp.set_cookie("refresh_token", refresh_token, httponly=True, secure=secure_cookie(), samesite="Lax", max_age=30*24*3600, path="/")
-    resp.set_cookie("csrf_token", csrf_token, httponly=False, secure=secure_cookie(), samesite="Lax", max_age=900, path="/")
-    return resp
+
+    return set_auth_cookies(resp, access_token, refresh_token, csrf_token)
 
 @settings_bp.route("/update/password", methods=["POST"])
 @auth_and_csrf_required
@@ -120,7 +120,7 @@ def delete_account(data):
     mongo.db.users.delete_one({"email": data["email"]})
 
     resp = make_response(jsonify({"message": "Account deleted"}))
-    resp.set_cookie("token", "", max_age=0, path="/")
-    resp.set_cookie("refresh_token", "", max_age=0, path="/")
-    resp.set_cookie("csrf_token", "", max_age=0, path="/")
+    resp.set_cookie("token", "", httponly=True, secure=True, samesite="None", max_age=0, path="/")
+    resp.set_cookie("refresh_token", "", httponly=True, secure=True, samesite="None", max_age=0, path="/")
+    resp.set_cookie("csrf_token", "", httponly=False, secure=True, samesite="None", max_age=0, path="/")
     return resp
