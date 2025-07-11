@@ -1,7 +1,7 @@
 FROM python:3.10-slim-bullseye
 
 RUN apt-get update && \
-    apt-get install -y ca-certificates tzdata && \
+    apt-get install -y ca-certificates tzdata libssl-dev gcc build-essential && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
