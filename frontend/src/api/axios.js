@@ -57,6 +57,11 @@ instance.interceptors.response.use(
       !originalRequest.url.includes("/auth/login") &&
       !originalRequest.url.includes("/auth/signup")
     ) {
+      const hasRefreshToken = document.cookie.includes("refresh_token=");
+      if (!hasRefreshToken) {
+        return Promise.reject(error); // don't try refresh
+      }
+
       originalRequest._retry = true;
 
       if (isRefreshing) {
@@ -72,7 +77,7 @@ instance.interceptors.response.use(
       try {
         await instance.post("/auth/refresh-token");
         processQueue(null);
-        return instance(originalRequest); // Retry original request
+        return instance(originalRequest);
       } catch (refreshError) {
         processQueue(refreshError);
         const current = window.location.pathname + window.location.search;
