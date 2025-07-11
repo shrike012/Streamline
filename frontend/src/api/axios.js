@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const instance = axios.create({
-  baseURL: "https://streamline-backend.up.railway.app/api",
+  baseURL: "/api",
   withCredentials: true,
   timeout: 10000,
 });

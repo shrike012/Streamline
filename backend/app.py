@@ -5,6 +5,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from redis import Redis
 from dotenv import load_dotenv
 import os, logging, atexit, sys
+from flask import send_from_directory
 
 # Load shared extensions
 from extensions import mongo, limiter
@@ -37,9 +38,6 @@ limiter.init_app(app)
 
 # Proxy support (for Railway)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1)
-
-# CORS setup
-CORS(app, supports_credentials=True, origins=[os.getenv("FRONTEND_ORIGIN")])
 
 # Cookie and request limits
 app.config.update(
@@ -96,6 +94,14 @@ app.register_blueprint(competitor_tracker_bp, url_prefix="/api/competitor-tracke
 app.register_blueprint(generators_bp, url_prefix="/api/generators")
 app.register_blueprint(notifications_bp, url_prefix="/api/notifications")
 app.register_blueprint(outliers_bp, url_prefix="/api/outliers")
+
+@app.route("/", defaults={"path": ""})
+@app.route("/<path:path>")
+def serve_static(path):
+    static_folder = os.path.join(os.path.dirname(__file__), "static")
+    if path and os.path.exists(os.path.join(static_folder, path)):
+        return send_from_directory(static_folder, path)
+    return send_from_directory(static_folder, "index.html")
 
 # Error handlers
 @app.errorhandler(Exception)
