@@ -13,7 +13,7 @@ numpy>=1.21
 redis>=3.0
 openai==1.93.1
 PyJWT==2.10.1
-pymongo==4.13.2
+pymongo[srv]==3.12
 python-dotenv==1.1.1
 python_dateutil==2.9.0.post0
 requests==2.32.4
