@@ -12,6 +12,8 @@ load_dotenv()
 
 # --- App Initialization ---
 app = Flask(__name__)
+app.config["MONGO_URI"] = os.getenv("MONGO_URI")
+mongo.init_app(app)
 app.config["ENV"] = os.getenv("FLASK_ENV", "development")
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1)
 
@@ -28,7 +30,6 @@ app.config.update(
 
 # --- App Config ---
 app.config.update(
-    MONGO_URI=os.getenv("MONGO_URI"),
     JWT_KEY=os.getenv("JWT_KEY"),
     JWT_REFRESH_KEY=os.getenv("JWT_REFRESH_KEY"),
     GOOGLE_CLIENT_ID=os.getenv("GOOGLE_CLIENT_ID"),
@@ -43,9 +44,6 @@ app.config.update(
 )
 
 # --- Init MongoDB + Redis + Rate Limiter ---
-print("Using Mongo URI:", os.getenv("MONGO_URI"))
-mongo.init_app(app)
-print("Mongo client created:", mongo.db)
 app.extensions["pymongo"] = mongo
 redis_client = Redis.from_url(
     app.config["REDIS_URI"],
