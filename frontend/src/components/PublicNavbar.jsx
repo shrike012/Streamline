@@ -172,6 +172,9 @@ export default function PublicNavbar() {
 
     try {
       await login(form);
+
+      await new Promise((r) => setTimeout(r, 50));
+
       const me = await getMe();
       setUser(me.data);
 
@@ -195,6 +198,7 @@ export default function PublicNavbar() {
 
     try {
       await signup(form);
+      await new Promise((r) => setTimeout(r, 50));
       const me = await getMe();
       setUser(me.data);
 

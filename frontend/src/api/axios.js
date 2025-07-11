@@ -1,32 +1,29 @@
 import axios from "axios";
 
-// Extract the csrf_token from cookies
-function getCSRFToken() {
-  const name = "csrf_token=";
-  const decoded = decodeURIComponent(document.cookie);
-  const cookies = decoded.split(";");
-
-  for (let cookie of cookies) {
-    cookie = cookie.trim();
-    if (cookie.startsWith(name)) {
-      return cookie.substring(name.length);
-    }
-  }
-  return null;
-}
-
 const instance = axios.create({
   baseURL: "https://streamline-backend.up.railway.app/api",
   withCredentials: true,
   timeout: 10000,
 });
 
-// Request interceptor to add CSRF token
 instance.interceptors.request.use((config) => {
-  const csrfToken = getCSRFToken();
+  const csrfToken = (() => {
+    const name = "csrf_token=";
+    const decoded = decodeURIComponent(document.cookie);
+    const cookies = decoded.split(";");
+    for (let cookie of cookies) {
+      cookie = cookie.trim();
+      if (cookie.startsWith(name)) {
+        return cookie.substring(name.length);
+      }
+    }
+    return null;
+  })();
+
   if (csrfToken) {
     config.headers["X-CSRF-Token"] = csrfToken;
   }
+
   return config;
 });
 

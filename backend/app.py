@@ -20,20 +20,6 @@ app.config["REDIS_URI"] = os.getenv("REDIS_URI")
 
 # MongoDB setup
 mongo.init_app(app)
-
-# --- Debug block ---
-print("===== MONGO DEBUG START =====")
-print("[ENV] FLASK_ENV =", app.config["ENV"])
-print("[CONFIG] MONGO_URI =", app.config.get("MONGO_URI"))
-print("[ENVVAR] MONGO_URI =", os.getenv("MONGO_URI"))
-try:
-    test_conn = mongo.cx.server_info()  # Forces connection
-    print("[SUCCESS] Connected to MongoDB")
-except Exception as e:
-    print("[ERROR] Failed to connect to MongoDB:", e)
-print("mongo.db is None?", mongo.db is None)
-print("===== MONGO DEBUG END =====")
-
 app.extensions["pymongo"] = mongo
 
 # Redis setup
