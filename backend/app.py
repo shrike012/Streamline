@@ -52,7 +52,9 @@ app.config.update(
 )
 
 # --- Init MongoDB + Redis + Rate Limiter ---
+print("Using Mongo URI:", os.getenv("MONGO_URI"))
 mongo.init_app(app)
+print("Mongo client created:", mongo.db)
 app.extensions["pymongo"] = mongo
 redis_client = Redis.from_url(
     app.config["REDIS_URI"],
