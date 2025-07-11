@@ -54,6 +54,7 @@ app.config.update(
 
 # --- Init MongoDB + Redis + Rate Limiter ---
 mongo.init_app(app)
+app.extensions["pymongo"] = mongo
 redis_client = Redis.from_url(
     app.config["REDIS_URI"],
     decode_responses=True,
