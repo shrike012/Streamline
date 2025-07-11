@@ -1,5 +1,3 @@
-// PublicNavbar.jsx
-
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
@@ -87,7 +85,6 @@ export default function PublicNavbar() {
     const token = params.get("token");
     const code = params.get("code");
 
-    // OAuth redirect flow
     if (code) {
       window.history.replaceState({}, document.title, window.location.pathname);
     }
@@ -98,9 +95,7 @@ export default function PublicNavbar() {
       window.history.replaceState({}, document.title, window.location.pathname);
     }
 
-    // If user is already authenticated
-    const accessToken = localStorage.getItem("accessToken");
-    if (!accessToken) return;
+    if (!document.cookie.includes("token=")) return;
 
     getMe()
       .then((res) => {
