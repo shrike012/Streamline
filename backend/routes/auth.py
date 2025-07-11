@@ -29,7 +29,7 @@ def set_auth_cookies(resp, access_token, refresh_token, csrf_token):
     secure = current_app.config["ENV"] == "production"
     resp.set_cookie("token", access_token, httponly=True, secure=secure, samesite="Lax", max_age=900, path="/")
     resp.set_cookie("refresh_token", refresh_token, httponly=True, secure=secure, samesite="Lax", max_age=2592000, path="/")
-    resp.set_cookie("csrf_token", csrf_token, httponly=False, secure=secure, samesite="Lax", max_age=900, path="/")
+    resp.set_cookie("csrf_token", csrf_token, httponly=False, secure=secure, samesite="None", max_age=900, path="/")
     return resp
 
 @auth_bp.route("/signup", methods=["POST"])
