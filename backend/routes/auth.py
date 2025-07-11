@@ -120,9 +120,13 @@ def refresh_token():
 def logout(data):
     current_app.logger.info(f"User logged out: {obfuscate_email(data['email'])}")
     resp = jsonify({"message": "Logged out"})
-    resp.set_cookie("token", "", max_age=0, path="/")
-    resp.set_cookie("refresh_token", "", max_age=0, path="/")
-    resp.set_cookie("csrf_token", "", max_age=0, path="/")
+
+    secure = current_app.config["ENV"] == "production"
+
+    resp.set_cookie("token", "", httponly=True, secure=secure, samesite="Lax", max_age=0, path="/")
+    resp.set_cookie("refresh_token", "", httponly=True, secure=secure, samesite="Lax", max_age=0, path="/")
+    resp.set_cookie("csrf_token", "", httponly=False, secure=secure, samesite="None", max_age=0, path="/")
+
     return resp
 
 @auth_bp.route("/google/callback")

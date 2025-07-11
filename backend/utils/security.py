@@ -63,6 +63,10 @@ def auth_and_csrf_required(f):
         if request.method in ["POST", "PUT", "DELETE", "PATCH"]:
             csrf_cookie = request.cookies.get("csrf_token")
             csrf_header = request.headers.get("X-CSRF-Token")
+
+            print("CSRF COOKIE:", csrf_cookie)
+            print("CSRF HEADER:", csrf_header)
+
             if not csrf_cookie or not csrf_header or csrf_cookie != csrf_header:
                 return jsonify({"error": "CSRF validation failed"}), 403
 
