@@ -26,10 +26,9 @@ def obfuscate_email(email: str) -> str:
     return email[:2] + "***" + email[-3:] if len(email) >= 6 else "***"
 
 def set_auth_cookies(resp, access_token, refresh_token, csrf_token):
-    secure = current_app.config["ENV"] == "production"
-    resp.set_cookie("token", access_token, httponly=True, secure=secure, samesite="Lax", max_age=900, path="/")
-    resp.set_cookie("refresh_token", refresh_token, httponly=True, secure=secure, samesite="Lax", max_age=2592000, path="/")
-    resp.set_cookie("csrf_token", csrf_token, httponly=False, secure=secure, samesite="None", max_age=900, path="/")
+    resp.set_cookie("token", access_token, httponly=True, secure=True, samesite="None", max_age=900, path="/")
+    resp.set_cookie("refresh_token", refresh_token, httponly=True, secure=True, samesite="None", max_age=2592000, path="/")
+    resp.set_cookie("csrf_token", csrf_token, httponly=False, secure=True, samesite="None", max_age=900, path="/")
     return resp
 
 @auth_bp.route("/signup", methods=["POST"])
@@ -120,12 +119,11 @@ def refresh_token():
 def logout(data):
     current_app.logger.info(f"User logged out: {obfuscate_email(data['email'])}")
     resp = jsonify({"message": "Logged out"})
+    resp.headers["Cache-Control"] = "no-store"
 
-    secure = current_app.config["ENV"] == "production"
-
-    resp.set_cookie("token", "", httponly=True, secure=secure, samesite="Lax", max_age=0, path="/")
-    resp.set_cookie("refresh_token", "", httponly=True, secure=secure, samesite="Lax", max_age=0, path="/")
-    resp.set_cookie("csrf_token", "", httponly=False, secure=secure, samesite="None", max_age=0, path="/")
+    resp.set_cookie("token", "", httponly=True, secure=True, samesite="None", max_age=0, path="/")
+    resp.set_cookie("refresh_token", "", httponly=True, secure=True, samesite="None", max_age=0, path="/")
+    resp.set_cookie("csrf_token", "", httponly=False, secure=True, samesite="None", max_age=0, path="/")
 
     return resp
 
