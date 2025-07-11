@@ -38,7 +38,6 @@ app.config.update(
 
 # --- App Config ---
 app.config.update(
-    MONGO_URI=os.getenv("MONGO_URL"),
     JWT_KEY=os.getenv("JWT_KEY"),
     JWT_REFRESH_KEY=os.getenv("JWT_REFRESH_KEY"),
     GOOGLE_CLIENT_ID=os.getenv("GOOGLE_CLIENT_ID"),
