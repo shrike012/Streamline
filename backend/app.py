@@ -10,16 +10,6 @@ from extensions import mongo, limiter
 # --- Load and validate environment variables ---
 load_dotenv()
 
-required_env_vars = [
-    "FRONTEND_ORIGIN", "MONGO_URL", "JWT_KEY", "JWT_REFRESH_KEY",
-    "GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REDIRECT_URI",
-    "FRONTEND_REDIRECT_URI", "FRONTEND_PASSWORD_RESET_URL",
-    "RESEND_API_KEY", "REDIS_URI"
-]
-for var in required_env_vars:
-    if not os.getenv(var):
-        raise RuntimeError(f"Missing required environment variable: {var}")
-
 # --- App Initialization ---
 app = Flask(__name__)
 app.config["ENV"] = os.getenv("FLASK_ENV", "development")
