@@ -10,14 +10,5 @@ export default defineConfig({
       usePolling: true,
       interval: 100,
     },
-    // Only apply proxy in development
-    ...(process.env.NODE_ENV === "development" && {
-      proxy: {
-        "/api": {
-          target: import.meta.env.VITE_BACKEND_URL || "http://backend:8080",
-          changeOrigin: true,
-        },
-      },
-    }),
   },
 });

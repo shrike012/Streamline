@@ -1,4 +1,4 @@
-from flask import Flask, current_app, jsonify
+from flask import Flask, request, current_app, jsonify
 from flask_limiter.errors import RateLimitExceeded
 from flask_cors import CORS
 from werkzeug.middleware.proxy_fix import ProxyFix
@@ -70,6 +70,14 @@ handler = logging.StreamHandler(sys.stdout)
 handler.setLevel(logging.INFO)
 handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
 app.logger.addHandler(handler)
+
+@app.before_request
+def log_request_info():
+    if request.path.startswith("/static"):
+        return
+    if request.method != "GET":
+        ip = request.headers.get("X-Forwarded-For", request.remote_addr)
+        app.logger.info(f"{request.method} {request.path} from {ip}")
 
 # --- Register Blueprints ---
 from routes.auth import auth_bp

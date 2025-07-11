@@ -16,7 +16,7 @@ function getCSRFToken() {
 }
 
 const instance = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || "/api",
+  baseURL: "https://streamline-backend.up.railway.app/api",
   withCredentials: true,
   timeout: 10000,
 });

@@ -1,0 +1,14 @@
+# Global ignores for Python backend
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+*.log
+.env
+.DS_Store
+
+# Frontend ignores for Docker context and mounts
+node_modules
+frontend/node_modules
+frontend/.env
+frontend/.vite
+frontend/.cache

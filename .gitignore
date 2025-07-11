@@ -26,9 +26,6 @@ frontend/build/
 frontend/yarn.lock
 frontend/package-lock.json
 
-# Docker
-**/.dockerignore
-
 # System
 .DS_Store
 Thumbs.db
