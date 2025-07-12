@@ -98,7 +98,7 @@ function NicheExplorer() {
       <Helmet>
         <title>Niche Explorer</title>
       </Helmet>
-      <h1 className="page-title">Niche Explorer</h1>
+      <h1>Niche Explorer</h1>
       <form onSubmit={handleSearch}>
         <div className="input-group-row">
           <input

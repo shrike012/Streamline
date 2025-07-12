@@ -89,7 +89,7 @@ function TitleGenerator() {
         <title>Title Generator</title>
       </Helmet>
       <div className="page-content">
-        <h1 className="page-title">Title Generator</h1>
+        <h1>Title Generator</h1>
 
         {!selectedChannel ? (
           <p style={{ padding: "2rem", color: "#888", textAlign: "center" }}>
