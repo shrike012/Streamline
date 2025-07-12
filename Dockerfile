@@ -19,9 +19,11 @@ RUN python -m nltk.downloader punkt
 COPY backend /app/backend
 
 # --- Build frontend ---
-COPY frontend /app/frontend
 WORKDIR /app/frontend
-RUN npm install --legacy-peer-deps && npm run build
+COPY frontend/package*.json ./
+RUN npm install --legacy-peer-deps
+COPY frontend .
+RUN npm run build
 
 # --- Move frontend dist into backend static folder ---
 RUN mkdir -p /app/backend/static && cp -r dist/* /app/backend/static/
