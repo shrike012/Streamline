@@ -3,7 +3,7 @@ FROM python:3.10-slim-bullseye
 # --- System dependencies ---
 RUN apt-get update && apt-get install -y \
     ca-certificates tzdata libssl-dev gcc build-essential curl && \
-    curl -fsSL https://deb.nodesource.com/setup_18.x | bash - && \
+    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - &&
     apt-get install -y nodejs && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 
