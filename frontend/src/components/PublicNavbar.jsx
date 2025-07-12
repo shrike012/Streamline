@@ -55,8 +55,10 @@ const PromptLink = ({ question, linkText, onClick }) => (
 );
 
 // --- OAuth Config ---
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-const REDIRECT_URI = import.meta.env.VITE_GOOGLE_REDIRECT_URI;
+const GOOGLE_CLIENT_ID =
+  "268582810078-64d209gus8ueakaa6ciaibgs44seqaf0.apps.googleusercontent.com";
+const REDIRECT_URI =
+  "https://streamline.up.railway.app/api/auth/google/callback";
 const SCOPE =
   "https://www.googleapis.com/auth/userinfo.email https://www.googleapis.com/auth/userinfo.profile openid";
 
