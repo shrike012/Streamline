@@ -17,6 +17,7 @@ app = Flask(__name__)
 app.config["ENV"] = os.getenv("FLASK_ENV", "development")
 app.config["MONGO_URI"] = os.getenv("MONGO_URI")
 app.config["REDIS_URI"] = os.getenv("REDIS_URI")
+print("REDIS_URI:", os.getenv("REDIS_URI"))
 
 # MongoDB setup
 mongo.init_app(app)
